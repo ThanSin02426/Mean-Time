@@ -49,9 +49,9 @@ def process_topic(topic, upload=True):
         vtt_data = parse_vtt(vtt_path)
 
         # 4. Video Assembly
-        output_video_path = f"final_short_{int(random.random()*1000)}.mp4"
+        os.makedirs("output", exist_ok=True)
+        output_video_path = "output/final_short.mp4"
         assemble_video(audio_path, vtt_data, image_paths, output_video_path)
-        temp_files.append(output_video_path)
 
         # 5. YouTube Upload
         if upload:
@@ -73,9 +73,6 @@ def process_topic(topic, upload=True):
         # Cleanup
         logger.info("Cleaning up temporary files...")
         for f in temp_files:
-            if f.endswith('.mp4') and not upload:
-                # Don't delete final video if upload was skipped so user can see it
-                continue
             if os.path.exists(f):
                 try:
                     os.remove(f)

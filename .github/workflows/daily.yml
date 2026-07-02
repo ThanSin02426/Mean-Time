@@ -70,12 +70,20 @@ jobs:
         # Run the command and evaluate it
         eval python src/main.py $TOPIC_ARG $PUBLISH_ARG
 
+    - name: Debug Output Directory
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
+      run: |
+        pwd
+        ls -R
+        find . -name "*.mp4" -type f
+
     - name: Upload Artifact (if not published)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: generated-short
-        path: autoshorts-pipeline/final_short_*.mp4
+        path: autoshorts-pipeline/output/final_short.mp4
+        if-no-files-found: error
 
     - name: Commit queue updates
       if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.topic == '')
