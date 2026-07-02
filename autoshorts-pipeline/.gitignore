@@ -1,0 +1,24 @@
+src/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project-specific
+temp_images/
+final_short_*.mp4
+temp_audio.mp3
+temp_subs.vtt
+assets/music/*.mp3
+assets/music/*.wav
+assets/music/*.m4a
