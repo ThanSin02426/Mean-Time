@@ -30,14 +30,16 @@ def process_topic(topic, upload=True):
         title = script_data.get('title', 'YouTube Short')
         description = script_data.get('description', '')
         tags = script_data.get('tags', [])
-        beats = script_data.get('beats', [])
+        scenes = script_data.get('scenes', [])
 
         # Extract full text for narration
-        full_text = " ".join([b['text'] for b in beats])
+        full_text = script_data.get('script')
+        if not full_text:
+            full_text = " ".join([s['text'] for s in scenes])
 
         # 2. Images Generation
         image_dir = "temp_images"
-        image_paths = generate_images(beats, output_dir=image_dir)
+        image_paths = generate_images(scenes, output_dir=image_dir)
         temp_files.extend(image_paths)
 
         # 3. Voiceover & Subtitles Generation

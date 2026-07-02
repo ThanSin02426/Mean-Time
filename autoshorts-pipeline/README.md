@@ -33,6 +33,8 @@ To run this pipeline via GitHub Actions, you must configure the following Reposi
 4. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions.
 5. Create a new secret named `GEMINI_API_KEY` and paste your key.
 
+By default, the script auto-detects the best Gemini Flash model available. If you want to force a specific model, add a GitHub secret (or `.env` variable) named `GEMINI_MODEL` (e.g., `gemini-2.5-flash`).
+
 ## 5. YouTube API Setup
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
@@ -116,6 +118,7 @@ python src/main.py --topic "3 strange facts about the ocean" --no-upload
 
 ## 12. Troubleshooting
 
+- **Gemini model not found error?** The script tries to auto-detect a working model, but if it fails, set `GEMINI_MODEL` as an environment variable/GitHub Secret to a currently supported model (e.g. `gemini-2.5-flash`).
 - **Workflow doesn't show in Actions?** Ensure that `.github/workflows/daily.yml` is at the absolute root of your repository, NOT inside `autoshorts-pipeline/`.
 - **Run workflow button is missing?** Ensure the `workflow_dispatch` trigger is properly defined in the `daily.yml` file.
 - **OAuth says access blocked?** Ensure you added your email address as a "Test User" on the OAuth consent screen in Google Cloud Console.
