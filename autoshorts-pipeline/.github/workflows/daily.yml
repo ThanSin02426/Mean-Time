@@ -4,7 +4,17 @@ on:
   schedule:
     # Runs at 14:00 UTC every day
     - cron: '0 14 * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Topic for the video (leave empty to pick randomly from topics.txt)'
+        required: false
+        type: string
+      publish:
+        description: 'Upload to YouTube?'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   generate_and_upload:
@@ -40,9 +50,32 @@ jobs:
         YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         PYTHONPATH: .
       run: |
-        python src/main.py --topics-file topics.txt
+        # Determine topic argument
+        if [ "${{ github.event.inputs.topic }}" != "" ]; then
+          TOPIC_ARG="--topic \"${{ github.event.inputs.topic }}\""
+        else
+          TOPIC_ARG="--topics-file topics.txt"
+        fi
+
+        # Determine publish argument (default is to publish if schedule, or if publish is true on dispatch)
+        if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ github.event.inputs.publish }}" == "true" ]; then
+          PUBLISH_ARG=""
+        else
+          PUBLISH_ARG="--no-upload"
+        fi
+
+        # Run the command and evaluate it
+        eval python src/main.py $TOPIC_ARG $PUBLISH_ARG
+
+    - name: Upload Artifact (if not published)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-short
+        path: final_short_*.mp4
 
     - name: Commit queue updates
+      if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.topic == '')
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"

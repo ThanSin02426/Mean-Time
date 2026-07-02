@@ -171,7 +171,7 @@ def assemble_video(audio_path, vtt_data, image_paths, output_path, music_dir="as
     final_audio = audio
 
     # Try to find and add background music
-    if os.path.exists(music_dir):
+    if os.path.exists(music_dir) and os.path.isdir(music_dir):
         music_files = [f for f in os.listdir(music_dir) if f.endswith(('.mp3', '.wav', '.m4a'))]
         if music_files:
             music_file = random.choice(music_files)
@@ -192,6 +192,10 @@ def assemble_video(audio_path, vtt_data, image_paths, output_path, music_dir="as
             bg_music = bg_music.volumex(0.15)
 
             final_audio = CompositeAudioClip([audio, bg_music])
+        else:
+            logger.info("Music directory is empty. Proceeding with narration-only audio.")
+    else:
+        logger.info(f"Music directory not found at {music_dir}. Proceeding with narration-only audio.")
 
     # Set final audio
     final_video = final_video.set_audio(final_audio)
