@@ -64,33 +64,15 @@ def validate_script_data(data):
     return data
 
 def get_best_gemini_model():
-    """Dynamically finds a working Gemini model."""
+    """Returns the best available Gemini model based on logic requested by the user."""
     # 1. Check environment variable
     env_model = os.environ.get("GEMINI_MODEL")
     if env_model:
         logger.info(f"Using GEMINI_MODEL from environment: {env_model}")
         return env_model
 
-    # 2. Dynamically list models and find a Flash model supporting generateContent
-    try:
-        models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-
-        # Prioritize flash models
-        flash_models = [m.name for m in models if 'flash' in m.name.lower()]
-        if flash_models:
-            # Sort to prefer newer versions if they follow naming conventions
-            flash_models.sort(reverse=True)
-            logger.info(f"Auto-detected Gemini Flash model: {flash_models[0]}")
-            return flash_models[0]
-
-        if models:
-            logger.info(f"Auto-detected fallback Gemini model: {models[0].name}")
-            return models[0].name
-    except Exception as e:
-        logger.warning(f"Failed to auto-detect Gemini models: {e}")
-
-    # 3. Fallback candidates if listing fails
-    return None
+    # Default as requested: Do not auto-select random preview/live models.
+    return "gemini-2.5-flash"
 
 def generate_script_gemini(topic):
     """Generates the script using Gemini API."""
@@ -103,11 +85,19 @@ def generate_script_gemini(topic):
 
     # Get best model or fallback to candidates
     best_model = get_best_gemini_model()
-    candidates = [best_model] if best_model else ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+    candidates = []
+    if os.environ.get("GEMINI_MODEL"):
+        candidates.append(os.environ.get("GEMINI_MODEL"))
+    else:
+        # Default candidate list as requested
+        candidates = [
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash"
+        ]
 
     last_err = None
     for candidate in candidates:
-        if not candidate: continue
         # Format name properly if it doesn't have models/ prefix
         model_name = candidate if candidate.startswith('models/') else f"models/{candidate}"
         logger.info(f"Attempting generation with Gemini model: {model_name}")

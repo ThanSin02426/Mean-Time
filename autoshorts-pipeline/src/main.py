@@ -4,7 +4,8 @@ import argparse
 import logging
 import random
 from src.script_gen import generate_script
-from src.voiceover import generate_audio, parse_vtt
+from src.voiceover import generate_audio
+import json
 from src.visuals import generate_images
 from src.video_assembly import assemble_video
 from src.uploader import upload_video
@@ -41,19 +42,29 @@ def process_topic(topic, upload=True):
         image_dir = "temp_images"
         image_paths = generate_images(scenes, output_dir=image_dir)
         temp_files.extend(image_paths)
+        logger.info(f"Generated {len(image_paths)} images.")
 
         # 3. Voiceover & Subtitles Generation
         audio_path = "temp_audio.mp3"
-        vtt_path = "temp_subs.vtt"
-        generate_audio(full_text, audio_path, vtt_path)
-        temp_files.extend([audio_path, vtt_path])
+        json_path = "temp_captions.json"
 
-        vtt_data = parse_vtt(vtt_path)
+        logger.info("Generating voiceover and capturing word boundaries...")
+        vtt_data = generate_audio(full_text, audio_path, json_path)
+        temp_files.extend([audio_path, json_path])
+        logger.info(f"Audio saved to: {audio_path}")
+        logger.info(f"Captions/timing saved to: {json_path}")
 
         # 4. Video Assembly
         os.makedirs("output", exist_ok=True)
         output_video_path = "output/final_short.mp4"
         assemble_video(audio_path, vtt_data, image_paths, output_video_path)
+
+        if os.path.exists(output_video_path):
+            file_size_mb = os.path.getsize(output_video_path) / (1024 * 1024)
+            logger.info(f"Final MP4 created successfully at {output_video_path} ({file_size_mb:.2f} MB)")
+        else:
+            logger.error(f"Failed to create final MP4 at {output_video_path}")
+            raise FileNotFoundError(f"Video assembly failed to produce {output_video_path}")
 
         # 5. YouTube Upload
         if upload:

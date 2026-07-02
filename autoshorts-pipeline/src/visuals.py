@@ -3,8 +3,41 @@ import time
 import requests
 import urllib.parse
 import logging
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
+
+def create_local_fallback_image(text, output_path, width=1080, height=1920):
+    """Creates a simple fallback image with centered text if API fails."""
+    logger.info(f"Creating local fallback image at {output_path}...")
+    img = Image.new('RGB', (width, height), color=(20, 20, 30))
+    draw = ImageDraw.Draw(img)
+
+    # Try to use a basic font, fallback to default if missing
+    try:
+        font = ImageFont.truetype("Arial.ttf", 60)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Wrap text roughly
+    words = text.split()
+    lines = []
+    current_line = []
+    for w in words:
+        current_line.append(w)
+        if len(' '.join(current_line)) > 25: # simplistic wrap
+            lines.append(' '.join(current_line))
+            current_line = []
+    if current_line:
+        lines.append(' '.join(current_line))
+
+    y_text = height // 2 - (len(lines) * 80) // 2
+    for line in lines:
+        draw.text((width//2, y_text), line, font=font, fill=(200, 200, 220), anchor="mm")
+        y_text += 80
+
+    img.save(output_path)
+    return output_path
 
 def generate_images(beats, output_dir="assets/images"):
     """
@@ -32,12 +65,13 @@ def generate_images(beats, output_dir="assets/images"):
         output_path = os.path.join(output_dir, f"scene_{i}.jpg")
 
         success = False
-        retries = 3
+        retries = int(os.environ.get("IMAGE_RETRIES", "2"))
+        timeout = int(os.environ.get("IMAGE_TIMEOUT_SECONDS", "20"))
 
         for attempt in range(retries):
             try:
                 logger.info(f"Downloading image {i+1}/{len(beats)}: {output_path} (Attempt {attempt+1}/{retries})")
-                response = requests.get(url, timeout=30)
+                response = requests.get(url, timeout=timeout)
                 response.raise_for_status()
 
                 with open(output_path, 'wb') as f:
@@ -49,11 +83,19 @@ def generate_images(beats, output_dir="assets/images"):
                 break # Break out of retry loop on success
             except Exception as e:
                 logger.error(f"Error downloading image {i}: {e}")
-                time.sleep(2) # Small delay before retry
+                if attempt < retries - 1:
+                    time.sleep(2) # Small delay before retry
 
         if not success:
-            logger.error(f"Failed to generate image for beat {i} after {retries} attempts.")
-            raise RuntimeError(f"Failed to generate image for beat {i}")
+            logger.error(f"Failed to generate image from API for scene {i}. Using local fallback image.")
+            try:
+                # Use scene text for the fallback image
+                scene_text = beat.get("text", f"Scene {i}")
+                fallback_path = create_local_fallback_image(scene_text, output_path)
+                image_paths.append(fallback_path)
+            except Exception as fallback_e:
+                logger.error(f"Local fallback image generation also failed: {fallback_e}")
+                raise RuntimeError(f"Completely failed to generate image for scene {i}")
 
     return image_paths
 
