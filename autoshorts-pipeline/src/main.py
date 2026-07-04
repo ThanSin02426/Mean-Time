@@ -18,16 +18,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("autoshorts")
 
-def process_topic(topic, upload=True):
+def process_topic(topic, upload=True, quality_mode="preview", image_provider_mode="hybrid"):
     """
     Runs the full end-to-end pipeline for a single topic.
     """
-    logger.info(f"=== Starting Pipeline for Topic: '{topic}' ===")
+    logger.info(f"=== Starting Pipeline for Topic: '{topic}' | Quality: {quality_mode} | Provider: {image_provider_mode} ===")
     temp_files = []
 
     try:
         # 1. Script Generation
-        script_data = generate_script(topic)
+        script_data = generate_script(topic, quality_mode=quality_mode)
         title = script_data.get('title', 'YouTube Short')
         description = script_data.get('description', '')
         tags = script_data.get('tags', [])
@@ -40,7 +40,7 @@ def process_topic(topic, upload=True):
 
         # 2. Images Generation
         image_dir = "temp_images"
-        image_paths = generate_images(scenes, output_dir=image_dir)
+        image_paths = generate_images(scenes, output_dir=image_dir, image_provider_mode=image_provider_mode)
         temp_files.extend(image_paths)
         logger.info(f"Generated {len(image_paths)} images.")
 
@@ -59,15 +59,26 @@ def process_topic(topic, upload=True):
         output_video_path = "output/final_short.mp4"
         assemble_video(audio_path, vtt_data, image_paths, output_video_path)
 
-        if os.path.exists(output_video_path):
-            file_size_mb = os.path.getsize(output_video_path) / (1024 * 1024)
-            logger.info(f"Final MP4 created successfully at {output_video_path} ({file_size_mb:.2f} MB)")
-        else:
+        if not os.path.exists(output_video_path):
             logger.error(f"Failed to create final MP4 at {output_video_path}")
             raise FileNotFoundError(f"Video assembly failed to produce {output_video_path}")
 
-        # 5. YouTube Upload
+        from moviepy.editor import VideoFileClip
+        final_clip = VideoFileClip(output_video_path)
+        final_duration = final_clip.duration
+        final_clip.close()
+
+        file_size_mb = os.path.getsize(output_video_path) / (1024 * 1024)
+        logger.info(f"Final MP4 created successfully at {output_video_path} ({file_size_mb:.2f} MB, {final_duration:.2f}s)")
+
+        # Quality Gate Check before Upload
         if upload:
+            logger.info("Running Quality Gate checks before upload...")
+            if final_duration > 59.0:
+                raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s). Shorts must be under 60s.")
+            if not image_paths:
+                raise RuntimeError("Quality Gate Failed: No visual scenes were generated.")
+
             video_url = upload_video(output_video_path, title, description, tags)
             # The prompt requested setting a thumbnail from the first scene image
             if image_paths:
@@ -103,6 +114,8 @@ def main():
     group.add_argument("--topics-file", type=str, help="File containing a list of topics (one per line). Will pick one randomly.")
 
     parser.add_argument("--no-upload", action="store_true", help="Skip YouTube upload and save video locally")
+    parser.add_argument("--quality-mode", type=str, choices=["preview", "production"], default="preview", help="Set target duration and scene count.")
+    parser.add_argument("--image-provider-mode", type=str, choices=["hybrid", "pollinations", "local_only"], default="hybrid", help="Choose how images are generated.")
 
     args = parser.parse_args()
 
@@ -129,7 +142,12 @@ def main():
             for t in topics:
                 f.write(t + '\n')
 
-    process_topic(topic, upload=not args.no_upload)
+    process_topic(
+        topic,
+        upload=not args.no_upload,
+        quality_mode=args.quality_mode,
+        image_provider_mode=args.image_provider_mode
+    )
 
 if __name__ == "__main__":
     main()

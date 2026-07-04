@@ -74,24 +74,27 @@ Because this script runs headlessly via GitHub Actions, it needs a refresh token
 10. Copy the **Refresh token**.
 11. Save it as a GitHub secret: `YOUTUBE_REFRESH_TOKEN`.
 
-## 8. How to Preview a Video from GitHub Actions
+## 8. Workflow Configuration & Modes
 
-You can manually trigger a video generation without publishing it to verify its quality:
-1. Go to your GitHub repository > **Actions**.
-2. Select the **Daily YouTube Shorts Auto-Publisher** workflow.
-3. Click **Run workflow**.
-4. Enter a topic (or leave it blank to pull from `topics.txt`).
-5. Ensure **Upload to YouTube?** (`publish`) is set to **false** (unchecked).
-6. Click **Run workflow**.
-7. Wait for the workflow to complete. Open the run details.
-8. Scroll down to the **Artifacts** section at the bottom of the Summary page.
-9. Download the `generated-short` artifact to preview your MP4 video.
+When triggering the workflow manually (via **Run workflow**), you have several options:
+- **Topic**: Leave blank to pop a topic from your `topics.txt` queue, or type a specific topic.
+- **Publish**: Check this to upload the video to YouTube. Leave it unchecked to run in **Preview Mode**. In Preview Mode, the video is rendered and saved as a downloadable GitHub Action Artifact instead of being uploaded.
+- **Quality Mode**:
+  - `preview` (default): Fast generation targeting ~30s and 3-4 scenes. Ideal for testing.
+  - `production`: Targets the full 45-55s duration with 5-7 scenes. Scheduled daily runs use this mode automatically.
+- **Image Provider Mode**:
+  - `hybrid` (default): Tries to use the AI Image generator, but gracefully falls back to beautiful typography slides if the API times out.
+  - `pollinations`: Strictly enforces AI image generation.
+  - `local_only`: Completely skips the AI image API and instantly generates modern text-based slides. Great for ultra-fast local testing.
 
-## 9. How to Publish
+## 9. How to Preview and Publish
 
-- Only set `publish` to **true** after you have checked the preview quality and are satisfied.
-- When `publish` is true, the workflow will directly upload the rendered video to YouTube using the YouTube Data API.
-- The pipeline will automatically include `#Shorts` in the title and description to optimize visibility.
+Always test your setup using **Preview Mode** first!
+1. Go to Actions > Daily YouTube Shorts Auto-Publisher.
+2. Click **Run workflow**. Keep **Publish** unchecked.
+3. Once the workflow finishes, open the run summary and scroll to the bottom to download the `generated-short` artifact.
+4. If everything looks good, you can check the **Publish** box on your next run.
+5. The pipeline has a built-in Quality Gate that explicitly blocks publishing if the video exceeds 58 seconds to ensure your video is successfully categorized as a Short on YouTube.
 
 ## 10. Music
 
@@ -118,6 +121,7 @@ python src/main.py --topic "3 strange facts about the ocean" --no-upload
 
 ## 12. Troubleshooting
 
+- **Write access to repository not granted?** If the workflow completes the video but fails at the final "Commit queue updates" step with a 403 error, go to your GitHub repository **Settings -> Actions -> General -> Workflow permissions** and select **Read and write permissions**.
 - **Gemini model not found error?** The script tries to auto-detect a working model, but if it fails, set `GEMINI_MODEL` as an environment variable/GitHub Secret to a currently supported model (e.g. `gemini-2.5-flash`).
 - **Workflow doesn't show in Actions?** Ensure that `.github/workflows/daily.yml` is at the absolute root of your repository, NOT inside `autoshorts-pipeline/`.
 - **Run workflow button is missing?** Ensure the `workflow_dispatch` trigger is properly defined in the `daily.yml` file.

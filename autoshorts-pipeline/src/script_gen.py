@@ -9,8 +9,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 PROMPT_TEMPLATE = """
-You are an expert YouTube Shorts creator. Create a script for a 45-60 second YouTube Short about "{topic}".
-Your response MUST be a valid JSON object. Do not include any markdown formatting like ```json or anything else, just the raw JSON.
+You are an expert YouTube Shorts creator. Create a highly engaging script about "{topic}".
+The script must be designed for maximum viewer retention.
+- Start with an extremely strong 2-second hook. Avoid generic intros (like "Did you know...").
+- Use short, spoken, fast-paced sentences.
+- Break the narration into {scene_count} scenes.
+- Each scene must have a short phrase of text (not a full paragraph) to ensure fast pacing.
+- The total narration length should naturally take about {target_duration} seconds when spoken.
+- Image prompts must be under 300 characters, highly descriptive, and include keywords: "cinematic, vertical 9:16, high contrast, no text, clean composition".
+
+Your response MUST be a valid JSON object. Do not include any markdown formatting like ```json or anything else.
 Ensure the JSON has the exact following structure:
 {{
   "script": "The full exact narration text for the entire short.",
@@ -19,12 +27,11 @@ Ensure the JSON has the exact following structure:
   "tags": ["tag1", "tag2", "tag3"],
   "scenes": [
     {{
-      "text": "The exact narration for this beat. Strong 3-second hook for the first beat.",
-      "image_prompt": "A highly detailed, visual description for an AI image generator to create the scene for this beat. No text in images."
+      "text": "The short spoken phrase for this scene. (Hook for the first scene)",
+      "image_prompt": "cinematic, vertical 9:16, high contrast, no text, clean composition, [scene specific description]"
     }}
   ]
 }}
-Generate between 5 to 8 scenes total. Make the text punchy, engaging, and end with a soft CTA to follow/subscribe in the final scene.
 """
 
 def extract_json(text):
@@ -74,14 +81,14 @@ def get_best_gemini_model():
     # Default as requested: Do not auto-select random preview/live models.
     return "gemini-2.5-flash"
 
-def generate_script_gemini(topic):
+def generate_script_gemini(topic, scene_count, target_duration):
     """Generates the script using Gemini API."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable not set.")
 
     genai.configure(api_key=api_key)
-    prompt = PROMPT_TEMPLATE.format(topic=topic)
+    prompt = PROMPT_TEMPLATE.format(topic=topic, scene_count=scene_count, target_duration=target_duration)
 
     # Get best model or fallback to candidates
     best_model = get_best_gemini_model()
@@ -151,10 +158,10 @@ def get_local_fallback(topic):
         ]
     }
 
-def generate_script_fallback(topic):
+def generate_script_fallback(topic, scene_count, target_duration):
     """Generates the script using Pollinations AI free text endpoint as fallback."""
     logger.info("Using Pollinations AI fallback for script generation...")
-    prompt = PROMPT_TEMPLATE.format(topic=topic)
+    prompt = PROMPT_TEMPLATE.format(topic=topic, scene_count=scene_count, target_duration=target_duration)
 
     try:
         # Pollinations supports POST with OpenAI-like payload for better prompt handling
@@ -175,17 +182,24 @@ def generate_script_fallback(topic):
         logger.error(f"Pollinations Fallback generation failed: {e}")
         return get_local_fallback(topic)
 
-def generate_script(topic):
+def generate_script(topic, quality_mode="preview"):
     """Main function to generate a script with multiple layers of fallback."""
     script_data = None
 
+    if quality_mode == "preview":
+        scene_count = "3 to 4"
+        target_duration = "25 to 35"
+    else:
+        scene_count = "5 to 7"
+        target_duration = "45 to 55"
+
     try:
-        logger.info(f"Attempting to generate script for topic: '{topic}' using Gemini...")
-        script_data = generate_script_gemini(topic)
+        logger.info(f"Attempting to generate script for topic: '{topic}' using Gemini ({quality_mode} mode)...")
+        script_data = generate_script_gemini(topic, scene_count, target_duration)
         logger.info("Gemini script generation succeeded.")
     except Exception as e:
         logger.warning(f"Gemini generation failed: {e}. Falling back to Pollinations AI.")
-        script_data = generate_script_fallback(topic)
+        script_data = generate_script_fallback(topic, scene_count, target_duration)
 
     if not script_data:
         # This acts as the absolute final net if the earlier functions somehow returned None

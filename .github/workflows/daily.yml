@@ -15,6 +15,27 @@ on:
         required: false
         type: boolean
         default: false
+      quality_mode:
+        description: 'Quality Mode (preview or production)'
+        required: false
+        type: choice
+        options:
+        - preview
+        - production
+        default: preview
+      image_provider_mode:
+        description: 'Image Provider (hybrid, pollinations, local_only)'
+        required: false
+        type: choice
+        options:
+        - hybrid
+        - pollinations
+        - local_only
+        default: hybrid
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   generate_and_upload:
@@ -36,7 +57,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg imagemagick
+        sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core
         # Fix ImageMagick policy for moviepy TextClip
         sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*"/<!-- <policy domain="path" rights="none" pattern="@\*" -->/' /etc/ImageMagick-6/policy.xml || true
 
@@ -68,8 +89,24 @@ jobs:
           PUBLISH_ARG="--no-upload"
         fi
 
+        # Configure Quality and Provider arguments
+        QUALITY_ARG="--quality-mode preview"
+        PROVIDER_ARG="--image-provider-mode hybrid"
+
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ github.event.inputs.quality_mode }}" != "" ]; then
+            QUALITY_ARG="--quality-mode ${{ github.event.inputs.quality_mode }}"
+          fi
+          if [ "${{ github.event.inputs.image_provider_mode }}" != "" ]; then
+            PROVIDER_ARG="--image-provider-mode ${{ github.event.inputs.image_provider_mode }}"
+          fi
+        else
+          # On schedule, default to production
+          QUALITY_ARG="--quality-mode production"
+        fi
+
         # Run the command and evaluate it
-        eval python src/main.py $TOPIC_ARG $PUBLISH_ARG
+        eval python src/main.py $TOPIC_ARG $PUBLISH_ARG $QUALITY_ARG $PROVIDER_ARG
 
     - name: Debug Output Directory
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
@@ -88,10 +125,13 @@ jobs:
 
     - name: Commit queue updates
       if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.topic == '')
+      continue-on-error: true
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add topics.txt
         # Only commit if there are changes
-        git diff --quiet && git diff --staged --quiet || git commit -m "chore: update topics queue"
-        git push
+        if ! git diff --quiet || ! git diff --staged --quiet; then
+          git commit -m "chore: update topics queue"
+          git push || echo "::warning::Write access to repository not granted. Please enable Read and write permissions in GitHub Settings."
+        fi
