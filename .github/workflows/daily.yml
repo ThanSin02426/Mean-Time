@@ -31,7 +31,7 @@ on:
         - hybrid
         - pollinations
         - local_only
-        default: hybrid
+        default: local_only
 
 permissions:
   contents: write
@@ -91,7 +91,7 @@ jobs:
 
         # Configure Quality and Provider arguments
         QUALITY_ARG="--quality-mode preview"
-        PROVIDER_ARG="--image-provider-mode hybrid"
+        PROVIDER_ARG="--image-provider-mode local_only"
 
         if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
           if [ "${{ github.event.inputs.quality_mode }}" != "" ]; then

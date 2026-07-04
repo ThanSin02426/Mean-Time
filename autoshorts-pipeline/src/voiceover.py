@@ -36,6 +36,19 @@ def generate_audio(text, output_mp3_path, output_json_path, voice="en-US-Christo
                         "end": end_sec
                     })
 
+        if not word_boundaries:
+            logger.warning("No WordBoundary events returned by TTS. Generating fallback boundaries based on text.")
+            words = text.split()
+            # Estimate 0.3s per word if we have no other data
+            for i, w in enumerate(words):
+                start_sec = i * 0.3
+                end_sec = start_sec + 0.3
+                word_boundaries.append({
+                    "word": w,
+                    "start": start_sec,
+                    "end": end_sec
+                })
+
     asyncio.run(_generate())
 
     # Save directly to JSON

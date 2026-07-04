@@ -40,7 +40,7 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
 
         # 2. Images Generation
         image_dir = "temp_images"
-        image_paths = generate_images(scenes, output_dir=image_dir, image_provider_mode=image_provider_mode)
+        image_paths = generate_images(scenes, output_dir=image_dir, image_provider_mode=image_provider_mode, quality_mode=quality_mode)
         temp_files.extend(image_paths)
         logger.info(f"Generated {len(image_paths)} images.")
 
@@ -57,7 +57,7 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
         # 4. Video Assembly
         os.makedirs("output", exist_ok=True)
         output_video_path = "output/final_short.mp4"
-        assemble_video(audio_path, vtt_data, image_paths, output_video_path)
+        assemble_video(audio_path, vtt_data, image_paths, output_video_path, quality_mode=quality_mode)
 
         if not os.path.exists(output_video_path):
             logger.error(f"Failed to create final MP4 at {output_video_path}")
@@ -92,6 +92,7 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
 
     except Exception as e:
         logger.error(f"Pipeline failed: {e}", exc_info=True)
+        raise
 
     finally:
         # Cleanup
