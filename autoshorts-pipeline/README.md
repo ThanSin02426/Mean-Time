@@ -3,12 +3,12 @@
 ## 1. Project Overview
 
 AutoShorts Pipeline is a completely free, automated Python pipeline that generates and publishes YouTube Shorts end-to-end. It requires no paid credits or subscriptions. It uses:
-- **Gemini** for script generation (with a fallback to Pollinations.ai)
-- **edge-tts** for voiceover and synchronized captions
-- **Pollinations** for high-quality, text-free AI images (Flux model)
-- **MoviePy & ffmpeg** for video assembly (Ken Burns effects, crossfades, ducked background music, and animated captions)
-- **YouTube Data API v3** for optional automated uploads
-- **GitHub Actions** for free cloud execution on a daily schedule
+- Gemini for script generation (with a fallback to Pollinations.ai)
+- edge-tts for voiceover and synchronized captions
+- Pexels/Pixabay APIs and NASA imagery for stock media visuals (with beautifully designed local slide fallbacks)
+- MoviePy & ffmpeg for video assembly (Ken Burns effects, crossfades, ducked background music, and animated captions)
+- YouTube Data API v3 for optional automated uploads
+- GitHub Actions for free cloud execution on a daily schedule
 
 ## 2. Repository Structure
 
@@ -24,6 +24,8 @@ To run this pipeline via GitHub Actions, you must configure the following Reposi
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
+- `PEXELS_API_KEY`
+- `PIXABAY_API_KEY` (optional fallback)
 
 ## 4. Gemini API Setup
 
@@ -74,35 +76,51 @@ Because this script runs headlessly via GitHub Actions, it needs a refresh token
 10. Copy the **Refresh token**.
 11. Save it as a GitHub secret: `YOUTUBE_REFRESH_TOKEN`.
 
-## 8. Workflow Configuration & Modes
+## 8. Workflow Configuration & Automatic Schedules
 
-When triggering the workflow manually (via **Run workflow**), you have several options:
+The GitHub Actions workflow operates automatically twice a day based on standard cron schedules:
+- **09:00 AM IST**
+- **07:30 PM IST**
+
+Scheduled runs will automatically pull a topic from `topics.txt` and publish directly to YouTube.
+
+You can also manually trigger a run (via **Run workflow**), where you have two simple options:
 - **Topic**: Leave blank to pop a topic from your `topics.txt` queue, or type a specific topic.
-- **Publish**: Check this to upload the video to YouTube. Leave it unchecked to run in **Preview Mode**. In Preview Mode, the video is rendered and saved as a downloadable GitHub Action Artifact instead of being uploaded.
-- **Quality Mode**:
-  - `preview` (default): Fast generation targeting ~30s and 3-4 scenes. Ideal for testing.
-  - `production`: Targets the full 45-55s duration with 5-7 scenes. Scheduled daily runs use this mode automatically.
-- **Image Provider Mode**:
-  - `hybrid` (default): Tries to use the AI Image generator, but gracefully falls back to beautiful typography slides if the API times out.
-  - `pollinations`: Strictly enforces AI image generation.
-  - `local_only`: Completely skips the AI image API and instantly generates modern text-based slides. Great for ultra-fast local testing.
+- **Publish**: Check this (`true`) to upload the video to YouTube. Leave it unchecked (`false`) to generate the video and upload it as a downloadable artifact for review instead.
 
-## 9. How to Preview and Publish
+## 9. Recommended Visual Media Strategy
 
-Always test your setup using **Preview Mode** first!
+The pipeline automatically handles sourcing high-quality vertical visuals for your Shorts using a prioritized cascade:
+1. **Pexels Video/Photo API** (Primary source)
+2. **Pixabay Video/Photo API** (Secondary fallback)
+3. **NASA Media Library** (Triggered exclusively for space/science topics)
+4. **Local Designed Fallback** (If all networks fail, generates beautiful, cinematic text-based slides)
+
+*Pollinations AI image generation is no longer used by default due to high unreliability and rate limiting.*
+
+## 10. How to Preview and Publish
+
+Always test your setup using **Preview Mode** first! We recommend starting with a fast test:
 1. Go to Actions > Daily YouTube Shorts Auto-Publisher.
-2. Click **Run workflow**. Keep **Publish** unchecked.
-3. Once the workflow finishes, open the run summary and scroll to the bottom to download the `generated-short` artifact.
-4. If everything looks good, you can check the **Publish** box on your next run.
-5. The pipeline has a built-in Quality Gate that explicitly blocks publishing if the video exceeds 58 seconds to ensure your video is successfully categorized as a Short on YouTube.
+2. Click **Run workflow**.
+3. Fill out the fields with these recommended settings:
+   - **Topic**: `3 terrifying space facts that sound fake`
+   - **Publish**: `false` (unchecked)
+4. Click **Run workflow** and wait for it to complete.
+5. Open the run details and scroll down to the **Artifacts** section at the bottom of the Summary page.
+6. Download the `generated-short` artifact to view your MP4 video and its metadata JSON.
+7. If everything looks good, you can re-run with **Publish** checked. The pipeline has a built-in Quality Gate that explicitly blocks publishing if the video exceeds 58 seconds.
 
-## 10. Music
+## 11. Music
 
-- Background music is **optional**.
-- If the `autoshorts-pipeline/assets/music/` directory is empty or missing, the pipeline will intelligently render a narration-only video without failing.
-- You can populate this folder later with free MP3/WAV tracks downloaded from the [YouTube Audio Library](https://studio.youtube.com/channel/UC/music).
+Do **NOT** attempt to use trending copyrighted YouTube Shorts songs automatically via scripts. It will cause copyright strikes.
+- The safest method is to manually download copyright-safe tracks from the [YouTube Audio Library](https://studio.youtube.com/channel/UC/music).
+- Place these files in `autoshorts-pipeline/assets/music/`.
+- If local music is found, the pipeline mixes it ducked under the voiceover.
+- If no local music exists, it will search the Pixabay Audio API for a cinematic track.
+- If all fails, it renders narration-only without crashing.
 
-## 11. Local Testing
+## 12. Local Testing
 
 To run and test the pipeline on your own machine:
 
@@ -119,7 +137,7 @@ cp .env.example .env
 python src/main.py --topic "3 strange facts about the ocean" --no-upload
 ```
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 - **Write access to repository not granted?** If the workflow completes the video but fails at the final "Commit queue updates" step with a 403 error, go to your GitHub repository **Settings -> Actions -> General -> Workflow permissions** and select **Read and write permissions**.
 - **Gemini model not found error?** The script tries to auto-detect a working model, but if it fails, set `GEMINI_MODEL` as an environment variable/GitHub Secret to a currently supported model (e.g. `gemini-2.5-flash`).

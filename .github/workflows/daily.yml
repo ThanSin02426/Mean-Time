@@ -2,7 +2,9 @@ name: Daily YouTube Shorts Auto-Publisher
 
 on:
   schedule:
-    # Runs at 14:00 UTC every day
+    # 03:30 UTC = 09:00 AM IST
+    - cron: '30 3 * * *'
+    # 14:00 UTC = 07:30 PM IST
     - cron: '0 14 * * *'
   workflow_dispatch:
     inputs:
@@ -15,23 +17,6 @@ on:
         required: false
         type: boolean
         default: false
-      quality_mode:
-        description: 'Quality Mode (preview or production)'
-        required: false
-        type: choice
-        options:
-        - preview
-        - production
-        default: preview
-      image_provider_mode:
-        description: 'Image Provider (hybrid, pollinations, local_only)'
-        required: false
-        type: choice
-        options:
-        - hybrid
-        - pollinations
-        - local_only
-        default: local_only
 
 permissions:
   contents: write
@@ -68,11 +53,13 @@ jobs:
 
     - name: Run AutoShorts Pipeline
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || vars.GEMINI_API_KEY }}
+        GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || vars.GEMINI_MODEL }}
         YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
         YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY || vars.PEXELS_API_KEY }}
+        PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY || vars.PIXABAY_API_KEY }}
         PYTHONPATH: .
       run: |
         # Determine topic argument
@@ -89,38 +76,18 @@ jobs:
           PUBLISH_ARG="--no-upload"
         fi
 
-        # Configure Quality and Provider arguments
-        QUALITY_ARG="--quality-mode preview"
-        PROVIDER_ARG="--image-provider-mode local_only"
-
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-          if [ "${{ github.event.inputs.quality_mode }}" != "" ]; then
-            QUALITY_ARG="--quality-mode ${{ github.event.inputs.quality_mode }}"
-          fi
-          if [ "${{ github.event.inputs.image_provider_mode }}" != "" ]; then
-            PROVIDER_ARG="--image-provider-mode ${{ github.event.inputs.image_provider_mode }}"
-          fi
-        else
-          # On schedule, default to production
-          QUALITY_ARG="--quality-mode production"
-        fi
-
         # Run the command and evaluate it
-        eval python src/main.py $TOPIC_ARG $PUBLISH_ARG $QUALITY_ARG $PROVIDER_ARG
+        eval python src/main.py $TOPIC_ARG $PUBLISH_ARG
 
-    - name: Debug Output Directory
-      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
-      run: |
-        pwd
-        ls -R
-        find . -name "*.mp4" -type f
-
-    - name: Upload Artifact (if not published)
+    - name: Upload Artifacts (if not published)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: generated-short
-        path: autoshorts-pipeline/output/final_short.mp4
+        path: |
+          autoshorts-pipeline/output/final_short.mp4
+          autoshorts-pipeline/output/metadata.json
+          autoshorts-pipeline/output/debug_contact_sheet.jpg
         if-no-files-found: error
 
     - name: Commit queue updates

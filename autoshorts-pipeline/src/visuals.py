@@ -181,51 +181,159 @@ def create_local_fallback_image(text, output_path, width=W, height=H, scene_inde
     return output_path
 
 
-def generate_images(beats, output_dir="assets/images", image_provider_mode="local_only", quality_mode="preview"):
+def search_pexels(query):
+    api_key = os.environ.get("PEXELS_API_KEY")
+    if not api_key:
+        return None
+
+    headers = {"Authorization": api_key}
+
+    # Try video first
+    try:
+        url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=5"
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("videos"):
+                video = random.choice(data["videos"])
+                video_files = video.get("video_files", [])
+                # Filter for HD vertical
+                hd_files = [f for f in video_files if f.get("width", 0) >= 720 and f.get("link")]
+                if hd_files:
+                    best_file = sorted(hd_files, key=lambda x: x.get("width", 0), reverse=True)[0]
+                    return {"url": best_file["link"], "type": "video", "source": "pexels", "author": video.get("user", {}).get("name")}
+    except Exception as e:
+        logger.warning(f"Pexels video search failed: {e}")
+
+    # Try photo
+    try:
+        url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=5"
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("photos"):
+                photo = random.choice(data["photos"])
+                return {"url": photo["src"]["large2x"], "type": "image", "source": "pexels", "author": photo.get("photographer")}
+    except Exception as e:
+        logger.warning(f"Pexels photo search failed: {e}")
+
+    return None
+
+def search_pixabay(query):
+    api_key = os.environ.get("PIXABAY_API_KEY")
+    if not api_key:
+        return None
+
+    # Try video first
+    try:
+        url = f"https://pixabay.com/api/videos/?key={api_key}&q={urllib.parse.quote(query)}&safesearch=true&per_page=5"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("hits"):
+                video = random.choice(data["hits"])
+                videos = video.get("videos", {})
+                if videos.get("large", {}).get("url"):
+                    return {"url": videos["large"]["url"], "type": "video", "source": "pixabay", "author": video.get("user")}
+                elif videos.get("medium", {}).get("url"):
+                    return {"url": videos["medium"]["url"], "type": "video", "source": "pixabay", "author": video.get("user")}
+    except Exception as e:
+        logger.warning(f"Pixabay video search failed: {e}")
+
+    # Try photo
+    try:
+        url = f"https://pixabay.com/api/?key={api_key}&q={urllib.parse.quote(query)}&image_type=photo&orientation=vertical&safesearch=true&per_page=5"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("hits"):
+                photo = random.choice(data["hits"])
+                return {"url": photo["largeImageURL"], "type": "image", "source": "pixabay", "author": photo.get("user")}
+    except Exception as e:
+        logger.warning(f"Pixabay photo search failed: {e}")
+
+    return None
+
+def search_nasa(query):
+    try:
+        url = f"https://images-api.nasa.gov/search?q={urllib.parse.quote(query)}&media_type=image"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get("collection", {}).get("items", [])
+            if items:
+                # Get links
+                links = items[0].get("links", [])
+                for link in links:
+                    if link.get("render") == "image":
+                        return {"url": link["href"], "type": "image", "source": "nasa", "author": "NASA"}
+    except Exception as e:
+        logger.warning(f"NASA search failed: {e}")
+    return None
+
+def download_media(url, output_path):
+    try:
+        resp = requests.get(url, stream=True, timeout=20)
+        resp.raise_for_status()
+        with open(output_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to download media from {url}: {e}")
+        return False
+
+def generate_visuals(scenes, output_dir="assets/visuals", topic=""):
     """
-    Generate scene images. In local_only mode this is fully deterministic and never touches the network.
+    Downloads stock media or generates fallback slides for each scene.
+    Returns a list of dictionaries with 'path' and 'metadata'.
     """
     os.makedirs(output_dir, exist_ok=True)
-    image_paths = []
-    logger.info(f"Generating {len(beats)} images using mode: {image_provider_mode}")
+    visual_data = []
 
-    for i, beat in enumerate(beats):
+    is_space_topic = any(kw in topic.lower() for kw in ["space", "planet", "galaxy", "black hole", "nasa", "moon", "mars", "asteroid", "universe", "star", "solar system"])
+
+    for i, scene in enumerate(scenes):
+        query = scene.get("search_query", scene.get("text", f"scene {i}"))
+        logger.info(f"Fetching visual for scene {i}: '{query}'")
+
+        media_info = None
+
+        # 1. Pexels First
+        media_info = search_pexels(query)
+
+        # 2. Pixabay Fallback
+        if not media_info:
+            media_info = search_pixabay(query)
+
+        # 3. NASA Fallback
+        if not media_info and is_space_topic:
+            media_info = search_nasa(query)
+
+        # 4. Download and configure
+        if media_info:
+            ext = ".mp4" if media_info["type"] == "video" else ".jpg"
+            output_path = os.path.join(output_dir, f"scene_{i}{ext}")
+
+            logger.info(f"Downloading from {media_info['source']}...")
+            if download_media(media_info["url"], output_path):
+                visual_data.append({
+                    "path": output_path,
+                    "type": media_info["type"],
+                    "source": media_info["source"],
+                    "author": media_info.get("author", "Unknown")
+                })
+                continue
+
+        # 5. Local Designed Fallback
+        logger.warning(f"No stock media found for scene {i}. Using local designed fallback.")
         output_path = os.path.join(output_dir, f"scene_{i}.jpg")
-        scene_text = beat.get("text") or beat.get("image_prompt") or f"Scene {i + 1}"
+        fallback_path = create_local_fallback_image(scene.get("text", ""), output_path, scene_index=i)
+        visual_data.append({
+            "path": fallback_path,
+            "type": "image",
+            "source": "local_fallback",
+            "author": "AutoShorts"
+        })
 
-        if image_provider_mode == "local_only":
-            image_paths.append(create_local_fallback_image(scene_text, output_path, scene_index=i))
-            continue
-
-        prompt = (beat.get("image_prompt") or scene_text).strip()
-        prompt = prompt[:300]
-        full_prompt = f"{prompt}, cinematic, vertical 9:16, high contrast, no text, clean composition"
-        encoded_prompt = urllib.parse.quote(full_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1920&nologo=true&seed={i}"
-
-        success = False
-        retries = int(os.environ.get("IMAGE_RETRIES", "1" if quality_mode == "preview" else "2"))
-        timeout = int(os.environ.get("IMAGE_TIMEOUT_SECONDS", "12" if quality_mode == "preview" else "20"))
-
-        for attempt in range(retries):
-            try:
-                logger.info(f"Downloading image {i+1}/{len(beats)}: {output_path} (Attempt {attempt+1}/{retries})")
-                response = requests.get(url, timeout=timeout)
-                response.raise_for_status()
-                with open(output_path, "wb") as f:
-                    f.write(response.content)
-                image_paths.append(output_path)
-                success = True
-                break
-            except Exception as e:
-                logger.warning(f"Image API failed for scene {i+1}: {e}")
-                if attempt < retries - 1:
-                    time.sleep(1)
-
-        if not success:
-            if image_provider_mode == "pollinations":
-                raise RuntimeError(f"Image API failed for scene {i+1} and pollinations-only mode is enabled")
-            logger.warning(f"Using designed local slide for scene {i+1}")
-            image_paths.append(create_local_fallback_image(scene_text, output_path, scene_index=i))
-
-    return image_paths
+    return visual_data

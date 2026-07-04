@@ -6,7 +6,6 @@ import random
 from src.script_gen import generate_script
 from src.voiceover import generate_audio
 import json
-from src.visuals import generate_images
 from src.video_assembly import assemble_video
 from src.uploader import upload_video
 
@@ -18,16 +17,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("autoshorts")
 
-def process_topic(topic, upload=True, quality_mode="preview", image_provider_mode="hybrid"):
+def process_topic(topic, upload=True):
     """
     Runs the full end-to-end pipeline for a single topic.
     """
-    logger.info(f"=== Starting Pipeline for Topic: '{topic}' | Quality: {quality_mode} | Provider: {image_provider_mode} ===")
+    logger.info(f"=== Starting Pipeline for Topic: '{topic}' ===")
     temp_files = []
 
     try:
         # 1. Script Generation
-        script_data = generate_script(topic, quality_mode=quality_mode)
+        script_data = generate_script(topic)
         title = script_data.get('title', 'YouTube Short')
         description = script_data.get('description', '')
         tags = script_data.get('tags', [])
@@ -38,11 +37,13 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
         if not full_text:
             full_text = " ".join([s['text'] for s in scenes])
 
-        # 2. Images Generation
+        # 2. Visuals Generation
         image_dir = "temp_images"
-        image_paths = generate_images(scenes, output_dir=image_dir, image_provider_mode=image_provider_mode, quality_mode=quality_mode)
+        from src.visuals import generate_visuals
+        visual_data = generate_visuals(scenes, output_dir=image_dir, topic=topic)
+        image_paths = [v["path"] for v in visual_data]
         temp_files.extend(image_paths)
-        logger.info(f"Generated {len(image_paths)} images.")
+        logger.info(f"Generated {len(visual_data)} visuals.")
 
         # 3. Voiceover & Subtitles Generation
         audio_path = "temp_audio.mp3"
@@ -57,7 +58,7 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
         # 4. Video Assembly
         os.makedirs("output", exist_ok=True)
         output_video_path = "output/final_short.mp4"
-        assemble_video(audio_path, vtt_data, image_paths, output_video_path, quality_mode=quality_mode)
+        assemble_video(audio_path, vtt_data, visual_data, output_video_path)
 
         if not os.path.exists(output_video_path):
             logger.error(f"Failed to create final MP4 at {output_video_path}")
@@ -69,16 +70,41 @@ def process_topic(topic, upload=True, quality_mode="preview", image_provider_mod
         final_clip.close()
 
         file_size_mb = os.path.getsize(output_video_path) / (1024 * 1024)
-        logger.info(f"Final MP4 created successfully at {output_video_path} ({file_size_mb:.2f} MB, {final_duration:.2f}s)")
+        word_count = len(vtt_data)
+        logger.info(f"--- Pipeline Summary ---")
+        logger.info(f"Scenes Generated: {len(image_paths)}")
+        logger.info(f"Narration Words: {word_count}")
+        logger.info(f"Video Duration: {final_duration:.2f}s")
+        logger.info(f"Output MP4: {output_video_path} ({file_size_mb:.2f} MB)")
+
+        # Generate Debug Contact Sheet
+        try:
+            # Only use images for the contact sheet to keep it simple, skip videos
+            img_paths = [v["path"] for v in visual_data if v["type"] == "image"]
+            if img_paths:
+                from PIL import Image
+                contact = Image.new('RGB', (1080*len(img_paths), 1920))
+                for idx, imp in enumerate(img_paths):
+                    im = Image.open(imp).convert("RGB").resize((1080, 1920))
+                    contact.paste(im, (idx*1080, 0))
+                contact.save("output/debug_contact_sheet.jpg")
+                logger.info("Debug contact sheet generated.")
+        except Exception as e:
+            logger.warning(f"Failed to create contact sheet: {e}")
 
         # Quality Gate Check before Upload
-        if upload:
-            logger.info("Running Quality Gate checks before upload...")
-            if final_duration > 59.0:
-                raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s). Shorts must be under 60s.")
-            if not image_paths:
-                raise RuntimeError("Quality Gate Failed: No visual scenes were generated.")
+        logger.info("Running Quality Gate checks...")
 
+        if final_duration > 58.0:
+            raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s). Shorts must be under 58s.")
+
+        if not image_paths:
+            raise RuntimeError("Quality Gate Failed: No visual scenes were generated.")
+
+        if word_count == 0:
+            raise RuntimeError("Quality Gate Failed: Captions JSON has zero words.")
+
+        if upload:
             video_url = upload_video(output_video_path, title, description, tags)
             # The prompt requested setting a thumbnail from the first scene image
             if image_paths:
@@ -115,8 +141,6 @@ def main():
     group.add_argument("--topics-file", type=str, help="File containing a list of topics (one per line). Will pick one randomly.")
 
     parser.add_argument("--no-upload", action="store_true", help="Skip YouTube upload and save video locally")
-    parser.add_argument("--quality-mode", type=str, choices=["preview", "production"], default="preview", help="Set target duration and scene count.")
-    parser.add_argument("--image-provider-mode", type=str, choices=["hybrid", "pollinations", "local_only"], default="hybrid", help="Choose how images are generated.")
 
     args = parser.parse_args()
 
@@ -143,12 +167,7 @@ def main():
             for t in topics:
                 f.write(t + '\n')
 
-    process_topic(
-        topic,
-        upload=not args.no_upload,
-        quality_mode=args.quality_mode,
-        image_provider_mode=args.image_provider_mode
-    )
+    process_topic(topic, upload=not args.no_upload)
 
 if __name__ == "__main__":
     main()

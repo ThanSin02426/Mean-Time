@@ -187,54 +187,131 @@ def _caption_overlay_clips(word_timings: List[Dict], output_dir="output/captions
     return clips, chunks
 
 
+def fetch_pixabay_music():
+    """Searches Pixabay for a random background track and downloads it."""
+    import requests
+    api_key = os.environ.get("PIXABAY_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        url = f"https://pixabay.com/api/audio/?key={api_key}&q=cinematic&per_page=10"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("hits"):
+                track = random.choice(data["hits"])
+                download_url = track.get("audio")
+                if download_url:
+                    output_path = "output/temp_bg_music.mp3"
+                    os.makedirs("output", exist_ok=True)
+                    audio_resp = requests.get(download_url, timeout=20)
+                    with open(output_path, "wb") as f:
+                        f.write(audio_resp.content)
+                    return {"path": output_path, "source": "pixabay", "author": track.get("user")}
+    except Exception as e:
+        logger.warning(f"Pixabay music search failed: {e}")
+    return None
+
 def _add_music(final_audio, total_duration, music_dir):
-    if not (os.path.exists(music_dir) and os.path.isdir(music_dir)):
-        logger.info(f"Music directory not found at {music_dir}. Proceeding with narration-only audio.")
-        return final_audio
-    music_files = [f for f in os.listdir(music_dir) if f.lower().endswith((".mp3", ".wav", ".m4a"))]
-    if not music_files:
-        logger.info("Music directory is empty. Proceeding with narration-only audio.")
-        return final_audio
+    music_path = None
+    music_meta = None
 
-    music_path = os.path.join(music_dir, random.choice(music_files))
-    logger.info(f"Adding background music: {music_path}")
-    bg = AudioFileClip(music_path)
-    if bg.duration < total_duration:
-        repeats = int(total_duration // bg.duration) + 1
-        bg = concatenate_audioclips([bg] * repeats)
-    bg = bg.subclip(0, total_duration).volumex(0.10)
-    return CompositeAudioClip([final_audio, bg])
+    # 1. Try local music
+    if os.path.exists(music_dir) and os.path.isdir(music_dir):
+        music_files = [f for f in os.listdir(music_dir) if f.lower().endswith((".mp3", ".wav", ".m4a"))]
+        if music_files:
+            music_file = random.choice(music_files)
+            music_path = os.path.join(music_dir, music_file)
+            music_meta = {"source": "local", "file": music_file}
 
+    # 2. Try Pixabay music fallback
+    if not music_path:
+        pixabay_music = fetch_pixabay_music()
+        if pixabay_music:
+            music_path = pixabay_music["path"]
+            music_meta = {"source": pixabay_music["source"], "author": pixabay_music["author"]}
 
-def assemble_video(audio_path, word_timings, image_paths, output_path, music_dir="assets/music", quality_mode="preview"):
+    # 3. Mix
+    if music_path:
+        logger.info(f"Adding background music: {music_path}")
+        try:
+            bg = AudioFileClip(music_path)
+            if bg.duration < total_duration:
+                repeats = int(total_duration // bg.duration) + 1
+                bg = concatenate_audioclips([bg] * repeats)
+            bg = bg.subclip(0, total_duration).volumex(0.10)
+            return CompositeAudioClip([final_audio, bg]), music_meta
+        except Exception as e:
+            logger.warning(f"Failed to mix background music: {e}")
+
+    logger.info("No music available. Proceeding with narration-only audio.")
+    return final_audio, None
+
+def crop_video_to_vertical(clip):
+    """Crops a landscape video clip to 9:16 vertical."""
+    w, h = clip.size
+    target_ratio = 1080 / 1920.0
+    current_ratio = w / h
+
+    if current_ratio > target_ratio:
+        # Crop sides
+        new_w = int(h * target_ratio)
+        x_center = w / 2
+        clip = clip.crop(x1=x_center - new_w/2, y1=0, x2=x_center + new_w/2, y2=h)
+    else:
+        # Crop top/bottom
+        new_h = int(w / target_ratio)
+        y_center = h / 2
+        clip = clip.crop(x1=0, y1=y_center - new_h/2, x2=w, y2=y_center + new_h/2)
+
+    return clip.resize((1080, 1920))
+
+def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir="assets/music"):
     logger.info("Starting deterministic video assembly...")
-    if not image_paths:
-        raise ValueError("No images provided for assembly.")
+    if not visual_data:
+        raise ValueError("No visuals provided for assembly.")
     if not word_timings:
         raise RuntimeError("No captions/word timings found; refusing to create uncaptained short.")
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     audio = AudioFileClip(audio_path)
     source_duration = float(audio.duration)
-    max_duration = 35.0 if quality_mode == "preview" else 58.0
+    max_duration = 58.0
     total_duration = min(source_duration, max_duration)
     if source_duration > max_duration:
-        logger.warning(f"Audio/video duration {source_duration:.2f}s exceeds {max_duration:.0f}s for {quality_mode}; trimming final output.")
+        logger.warning(f"Audio/video duration {source_duration:.2f}s exceeds {max_duration:.0f}s; trimming final output.")
         audio = audio.subclip(0, total_duration)
         word_timings = [w for w in word_timings if float(w.get("start", 0)) <= total_duration]
 
     padding = 0.25
-    n = len(image_paths)
+    n = len(visual_data)
     scene_duration = (total_duration + (n - 1) * padding) / n
     logger.info(f"Video duration: {total_duration:.2f}s | Scenes: {n} | Scene duration: {scene_duration:.2f}s | Crossfade: {padding}s")
 
     visual_clips = []
     temp_resized = []
-    for i, img_path in enumerate(image_paths):
-        resized_path = resize_image_for_video(img_path)
-        temp_resized.append(resized_path)
-        clip = ImageClip(resized_path).set_duration(scene_duration)
-        clip = apply_ken_burns(clip, scene_index=i)
+
+    for i, item in enumerate(visual_data):
+        path = item["path"]
+        mtype = item["type"]
+
+        if mtype == "video":
+            from moviepy.editor import VideoFileClip
+            clip = VideoFileClip(path).without_audio()
+            if clip.duration < scene_duration:
+                # Import required here since it was missing at top level
+                from moviepy.editor import concatenate_videoclips
+                repeats = int(scene_duration // clip.duration) + 1
+                clip = concatenate_videoclips([clip] * repeats)
+            clip = clip.subclip(0, scene_duration)
+            clip = crop_video_to_vertical(clip)
+        else:
+            resized_path = resize_image_for_video(path)
+            temp_resized.append(resized_path)
+            clip = ImageClip(resized_path).set_duration(scene_duration)
+            clip = apply_ken_burns(clip, scene_index=i)
+
         if i > 0:
             clip = clip.set_start(visual_clips[-1].end - padding).crossfadein(padding)
         visual_clips.append(clip)
@@ -245,7 +322,7 @@ def assemble_video(audio_path, word_timings, image_paths, output_path, music_dir
         raise RuntimeError("Caption overlay generation produced zero clips.")
 
     final_video = CompositeVideoClip([base] + caption_clips, size=(W, H)).set_duration(total_duration)
-    final_audio = _add_music(audio, total_duration, music_dir)
+    final_audio, music_meta = _add_music(audio, total_duration, music_dir)
     final_video = final_video.set_audio(final_audio)
 
     logger.info(f"Exporting final video to {output_path}")
@@ -264,6 +341,15 @@ def assemble_video(audio_path, word_timings, image_paths, output_path, music_dir
             os.remove(p)
         except Exception:
             pass
+
+    # Save Metadata JSON
+    import json
+    metadata = {
+        "visuals": [{"source": v["source"], "author": v["author"]} for v in visual_data],
+        "music": music_meta
+    }
+    with open("output/metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
 
     logger.info(f"Video assembly complete: {output_path}")
     return output_path
