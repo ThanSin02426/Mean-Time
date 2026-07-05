@@ -209,15 +209,17 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
         return []
 
     td = float(total_duration) if total_duration is not None else None
+    lead = float(os.environ.get("CAPTION_LEAD_SECONDS", "0.0") or 0.0)
     for i, chunk in enumerate(raw_chunks):
-        # Small lead makes reading feel natural, but keep order anchored to STT audio.
+        # Keep captions anchored to Whisper timestamps. Default lead is zero to avoid captions
+        # appearing before the spoken audio. Users can tune CAPTION_LEAD_SECONDS if needed.
         if i == 0:
-            chunk["start"] = 0.0
+            chunk["start"] = max(0.0, min(chunk["start"], 0.15) - lead)
         else:
-            chunk["start"] = max(0.0, chunk["start"] - 0.04)
+            chunk["start"] = max(0.0, chunk["start"] - lead)
 
         if i < len(raw_chunks) - 1:
-            next_start = max(chunk["start"] + 0.55, raw_chunks[i + 1]["start"] - 0.04)
+            next_start = max(chunk["start"] + 0.45, raw_chunks[i + 1]["start"] - lead)
             chunk["end"] = next_start
         else:
             chunk["end"] = max(chunk["natural_end"] + 0.35, td if td is not None else chunk["natural_end"] + 0.35)
@@ -426,8 +428,11 @@ def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir
     # Save Metadata JSON
     import json
     metadata = {
-        "visuals": [{"source": v["source"], "author": v["author"]} for v in visual_data],
-        "music": music_meta
+        "visuals": [{"source": v.get("source"), "author": v.get("author"), "type": v.get("type")} for v in visual_data],
+        "music": music_meta,
+        "caption_chunks": len(chunks),
+        "caption_words": len(word_timings),
+        "duration_seconds": total_duration,
     }
     with open("output/metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

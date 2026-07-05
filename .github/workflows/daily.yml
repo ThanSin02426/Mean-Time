@@ -50,9 +50,8 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core
-        # Fix ImageMagick policy for moviepy TextClip
-        sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*"/<!-- <policy domain="path" rights="none" pattern="@\*" -->/' /etc/ImageMagick-6/policy.xml || true
+        sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core libgomp1
+        # ImageMagick is installed only for compatibility. Captions are rendered with PIL, not TextClip.
 
     - name: Install Python dependencies
       run: |
@@ -71,6 +70,7 @@ jobs:
         WHISPER_MODEL: ${{ secrets.WHISPER_MODEL || vars.WHISPER_MODEL || 'tiny.en' }}
         WHISPER_DEVICE: cpu
         WHISPER_COMPUTE_TYPE: int8
+        CAPTION_LEAD_SECONDS: "0.0"
         PYTHONPATH: .
         WORKFLOW_TOPIC: ${{ github.event.inputs.topic }}
       run: |

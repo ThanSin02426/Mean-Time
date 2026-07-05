@@ -79,6 +79,7 @@ def transcribe_audio_with_whisper(
             vad_filter=False,
             beam_size=1,
             condition_on_previous_text=False,
+            initial_prompt=(reference_text[:220] if reference_text else None),
         )
 
         for segment in segments:
