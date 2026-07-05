@@ -146,3 +146,29 @@ python src/main.py --topic "3 strange facts about the ocean" --no-upload
 - **OAuth says access blocked?** Ensure you added your email address as a "Test User" on the OAuth consent screen in Google Cloud Console.
 - **OAuth Playground redirect fails?** Ensure you created the OAuth client as a **Web application** (not a Desktop app) and typed the redirect URI perfectly.
 - **Video artifact is missing?** Ensure `publish` was false and that the `upload-artifact` step executed successfully without path errors.
+
+## Queue and Caption Reliability Notes
+
+### Never-ending topic queue
+
+When the workflow runs with `topics.txt`, the app now uses the first topic, removes it, and appends a new similar topic to the end of the file. This keeps the queue moving forever instead of slowly becoming empty.
+
+Example behavior:
+
+```text
+Before:
+1. 3 terrifying space facts that sound fake
+2. The darkest secrets of the deep ocean
+...
+
+After one scheduled run:
+1. The darkest secrets of the deep ocean
+...
+10. 3 black hole facts that feel impossible
+```
+
+Because the similar topic is appended at the end, the same topic family returns only after the queue has cycled through the other topics.
+
+### Subtitle coverage
+
+Captions now use `captions.json` word timings only. Phrase captions are extended until the next phrase starts, and the final caption is extended to the end of the video. This prevents missing subtitles during pauses and avoids large empty gaps while speech is playing.

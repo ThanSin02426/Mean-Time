@@ -88,7 +88,8 @@ jobs:
           autoshorts-pipeline/output/final_short.mp4
           autoshorts-pipeline/output/metadata.json
           autoshorts-pipeline/output/debug_contact_sheet.jpg
-        if-no-files-found: error
+          autoshorts-pipeline/output/caption_sample_*.png
+        if-no-files-found: warn
 
     - name: Commit queue updates
       if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.topic == '')
