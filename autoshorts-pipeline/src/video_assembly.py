@@ -10,6 +10,12 @@ from moviepy.editor import (
 )
 from PIL import Image, ImageDraw, ImageFont
 
+# MoviePy 1.0.3 still references PIL.Image.ANTIALIAS, which was removed
+# in Pillow 10. Keep a tiny compatibility shim so GitHub Actions does not
+# crash during clip.resize().
+if not hasattr(Image, "ANTIALIAS"):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
+
 logger = logging.getLogger(__name__)
 
 W, H = 1080, 1920

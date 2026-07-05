@@ -109,7 +109,41 @@ def _gradient_background(width=W, height=H, theme=None):
     return img
 
 
-def create_local_fallback_image(text, output_path, width=W, height=H, scene_index=0):
+
+
+def _draw_vector_icon(draw: ImageDraw.ImageDraw, center, radius: int, theme, scene_index: int, topic_text: str = ""):
+    """Draw safe vector icons with PIL shapes only. No emoji fonts/glyphs."""
+    cx, cy = center
+    accent = theme["accent"]
+    low = topic_text.lower()
+
+    # Glow circle behind icon
+    draw.ellipse((cx-radius-26, cy-radius-26, cx+radius+26, cy+radius+26), fill=(*accent, 38), outline=(*accent, 120), width=4)
+
+    if any(k in low for k in ["space", "planet", "moon", "mars", "star", "galaxy", "universe"]):
+        # Planet + ring
+        draw.ellipse((cx-radius//2, cy-radius//2, cx+radius//2, cy+radius//2), fill=(*accent, 210), outline=(255,255,255,210), width=5)
+        draw.arc((cx-radius, cy-radius//2, cx+radius, cy+radius//2), start=8, end=172, fill=(255,255,255,220), width=8)
+        draw.arc((cx-radius, cy-radius//2, cx+radius, cy+radius//2), start=188, end=352, fill=(255,255,255,160), width=8)
+        for sx, sy, rr in [(cx-170, cy-120, 7), (cx+150, cy-90, 5), (cx+125, cy+130, 6), (cx-135, cy+110, 4)]:
+            draw.ellipse((sx-rr, sy-rr, sx+rr, sy+rr), fill=(255,255,255,210))
+    elif any(k in low for k in ["danger", "terrifying", "scary", "warning"]):
+        # Warning triangle
+        pts = [(cx, cy-radius), (cx-radius, cy+radius), (cx+radius, cy+radius)]
+        draw.polygon(pts, fill=(*accent, 225), outline=(255,255,255,230))
+        f = _font(138, True)
+        draw.text((cx, cy+22), "!", font=f, fill=(12,12,18), anchor="mm")
+    elif "diamond" in low:
+        pts = [(cx, cy-radius), (cx+radius, cy), (cx, cy+radius), (cx-radius, cy)]
+        draw.polygon(pts, fill=(*accent, 220), outline=(255,255,255,230))
+        draw.line((cx-radius, cy, cx, cy-radius, cx+radius, cy, cx, cy+radius, cx-radius, cy), fill=(255,255,255,120), width=4)
+    else:
+        # Mystery circle / question mark
+        draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), fill=(*accent, 210), outline=(255,255,255,220), width=5)
+        f = _font(150, True)
+        draw.text((cx, cy+10), "?", font=f, fill=(12,12,18), anchor="mm")
+
+def create_local_fallback_image(text, output_path, width=W, height=H, scene_index=0, support_text=None, total_scenes=None):
     """Create a complete designed 9:16 slide that looks usable even with no AI image API."""
     logger.info(f"Creating designed local slide at {output_path}...")
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -119,18 +153,16 @@ def create_local_fallback_image(text, output_path, width=W, height=H, scene_inde
     draw = ImageDraw.Draw(img)
 
     accent = theme["accent"]
-    emoji = _pick_emoji(text, theme.get("emoji", "🤯"))
 
     # Make scene text short and punchy for visual headline/support line.
     clean = " ".join(text.replace("\n", " ").split())
     headline = _shorten(clean, 5).upper()
-    support = _shorten(clean, 12)
-    if support.lower().startswith(headline.lower()):
-        support = "Watch till the end."
+    support = _shorten(support_text or clean, 10)
+    if support.lower().startswith(headline.lower()) or support.upper() == headline:
+        support = "A fact that feels impossible."
 
     headline_font = _font(108, True)
     support_font = _font(48, False)
-    emoji_font = _font(190, True)
     pill_font = _font(36, True)
 
     safe_x = 86
@@ -146,8 +178,8 @@ def create_local_fallback_image(text, output_path, width=W, height=H, scene_inde
     draw.rounded_rectangle((pill_x, pill_y, pill_x + pill_w, pill_y + pill_h), radius=36, fill=(*accent, 230))
     draw.text((width // 2, pill_y + pill_h // 2), pill_text, font=pill_font, fill=(10, 10, 15), anchor="mm")
 
-    # emoji/icon
-    draw.text((width // 2, 410), emoji, font=emoji_font, fill=(255, 255, 255), anchor="mm")
+    # vector icon: never use emoji fonts on GitHub Actions
+    _draw_vector_icon(draw, (width // 2, 430), 142, theme, scene_index, clean)
 
     # headline block
     headline_lines = _wrap_to_width(headline, headline_font, max_text_width, 3)
@@ -172,10 +204,11 @@ def create_local_fallback_image(text, output_path, width=W, height=H, scene_inde
         draw.text((width // 2, sy), line, font=support_font, fill=(235, 240, 255, 255), anchor="mm")
         sy += 60
 
-    # bottom CTA/safe area marker
-    cta = "FOLLOW FOR MORE"
-    cta_font = _font(34, True)
-    draw.text((width // 2, height - 210), cta, font=cta_font, fill=(*accent, 230), anchor="mm")
+    # Optional final-scene CTA only. Keep bottom caption area clean on earlier scenes.
+    if total_scenes is not None and scene_index == total_scenes - 1:
+        cta = "FOLLOW FOR MORE"
+        cta_font = _font(34, True)
+        draw.text((width // 2, height - 210), cta, font=cta_font, fill=(*accent, 230), anchor="mm")
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path
@@ -328,7 +361,13 @@ def generate_visuals(scenes, output_dir="assets/visuals", topic=""):
         # 5. Local Designed Fallback
         logger.warning(f"No stock media found for scene {i}. Using local designed fallback.")
         output_path = os.path.join(output_dir, f"scene_{i}.jpg")
-        fallback_path = create_local_fallback_image(scene.get("text", ""), output_path, scene_index=i)
+        fallback_path = create_local_fallback_image(
+            scene.get("text", ""),
+            output_path,
+            scene_index=i,
+            support_text=scene.get("support", ""),
+            total_scenes=len(scenes),
+        )
         visual_data.append({
             "path": fallback_path,
             "type": "image",

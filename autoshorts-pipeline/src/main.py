@@ -3,6 +3,16 @@ import sys
 import argparse
 import logging
 import random
+
+# Pillow 10+ removed Image.ANTIALIAS, but MoviePy 1.0.3 still calls it.
+# Install the compatibility alias before importing MoviePy-heavy modules.
+try:
+    from PIL import Image
+    if not hasattr(Image, "ANTIALIAS"):
+        Image.ANTIALIAS = Image.Resampling.LANCZOS
+except Exception:
+    pass
+
 from src.script_gen import generate_script
 from src.voiceover import generate_audio
 import json
