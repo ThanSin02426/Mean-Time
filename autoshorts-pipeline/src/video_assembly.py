@@ -10,9 +10,7 @@ from moviepy.editor import (
 )
 from PIL import Image, ImageDraw, ImageFont
 
-# MoviePy 1.0.3 still references PIL.Image.ANTIALIAS, which was removed
-# in Pillow 10. Keep a tiny compatibility shim so GitHub Actions does not
-# crash during clip.resize().
+# MoviePy 1.0.3 still references PIL.Image.ANTIALIAS, removed in Pillow 10.
 if not hasattr(Image, "ANTIALIAS"):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
 
@@ -164,12 +162,15 @@ def _make_caption_png(chunk: Dict, out_path: str, active_word_index: int = -1):
 
 def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration: float = None):
     """
-    Build readable phrase-caption chunks from word timings.
+    Build phrase captions from ACTUAL STT/Whisper timings.
 
-    Important fix: older logic ended each chunk at the final word end, so captions
-    disappeared during natural pauses and looked out of sync. This version extends
-    each chunk until the next chunk starts and extends the final chunk to the end
-    of the narration/video. Result: subtitles stay present through the full video.
+    Sync rule:
+    - chunk start = first spoken word start, with tiny early lead
+    - chunk end = next chunk start, so captions remain present through pauses
+    - final chunk extends to the final video/audio duration
+
+    This keeps subtitles visible through the whole short while still changing only
+    when the spoken audio reaches the next phrase.
     """
     cleaned = []
     for w in word_timings:
@@ -181,13 +182,17 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
             end = float(w.get("end", start + 0.25))
         except Exception:
             continue
-        if end < start:
-            end = start + 0.25
+        if end <= start:
+            end = start + 0.18
+        if total_duration is not None:
+            start = max(0.0, min(start, float(total_duration)))
+            end = max(start + 0.08, min(end, float(total_duration)))
         cleaned.append({"word": word, "start": start, "end": end})
 
     if not cleaned:
         return []
 
+    cleaned.sort(key=lambda x: (x["start"], x["end"]))
     raw_chunks, cur = [], []
     for i, w in enumerate(cleaned):
         cur.append(w)
@@ -195,7 +200,7 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
         next_start = cleaned[i + 1]["start"] if not is_last else None
         gap_after_word = (next_start - w["end"]) if next_start is not None else 0.0
         punctuation_break = w["word"].endswith((".", "?", "!", ":", ";"))
-        should_break = len(cur) >= max_words or gap_after_word > 0.65 or punctuation_break or is_last
+        should_break = len(cur) >= max_words or punctuation_break or gap_after_word > 0.9 or is_last
         if should_break:
             raw_chunks.append({"words": cur[:], "start": cur[0]["start"], "natural_end": cur[-1]["end"]})
             cur = []
@@ -203,25 +208,25 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
     if not raw_chunks:
         return []
 
+    td = float(total_duration) if total_duration is not None else None
     for i, chunk in enumerate(raw_chunks):
+        # Small lead makes reading feel natural, but keep order anchored to STT audio.
         if i == 0:
-            # Let the first caption be visible immediately, even if TTS has a tiny lead-in.
             chunk["start"] = 0.0
         else:
-            chunk["start"] = max(0.0, chunk["start"])
+            chunk["start"] = max(0.0, chunk["start"] - 0.04)
 
         if i < len(raw_chunks) - 1:
-            next_start = max(chunk["start"] + 0.75, raw_chunks[i + 1]["start"])
+            next_start = max(chunk["start"] + 0.55, raw_chunks[i + 1]["start"] - 0.04)
             chunk["end"] = next_start
         else:
-            target_end = total_duration if total_duration is not None else chunk["natural_end"] + 0.75
-            chunk["end"] = max(chunk["natural_end"] + 0.35, float(target_end))
+            chunk["end"] = max(chunk["natural_end"] + 0.35, td if td is not None else chunk["natural_end"] + 0.35)
 
-        if total_duration is not None:
-            chunk["start"] = min(chunk["start"], max(0.0, float(total_duration) - 0.35))
-            chunk["end"] = min(chunk["end"], float(total_duration))
+        if td is not None:
+            chunk["start"] = min(chunk["start"], max(0.0, td - 0.35))
+            chunk["end"] = min(max(chunk["end"], chunk["start"] + 0.45), td)
         if chunk["end"] <= chunk["start"]:
-            chunk["end"] = chunk["start"] + 0.75
+            chunk["end"] = chunk["start"] + 0.45
 
     return raw_chunks
 
@@ -230,15 +235,16 @@ def _caption_overlay_clips(word_timings: List[Dict], total_duration: float, outp
     chunks = _group_caption_chunks(word_timings, max_words=4, total_duration=total_duration)
     clips = []
     os.makedirs(output_dir, exist_ok=True)
+
     for idx, chunk in enumerate(chunks):
         png_path = os.path.join(output_dir, f"caption_{idx:03d}.png")
+        # Phrase captions are synced by chunk timing. Use stable highlight on the first word.
         _make_caption_png(chunk, png_path, active_word_index=0)
         start = max(0.0, float(chunk["start"]))
         end = min(float(chunk["end"]), float(total_duration))
         duration = max(0.35, end - start)
         clips.append(ImageClip(png_path).set_start(start).set_duration(duration))
 
-        # Save a few easy-to-download caption samples for debugging artifacts.
         if idx < 5:
             sample_path = os.path.join("output", f"caption_sample_{idx:02d}.png")
             try:
@@ -247,7 +253,6 @@ def _caption_overlay_clips(word_timings: List[Dict], total_duration: float, outp
                 logger.warning(f"Could not save caption sample {idx}: {exc}")
 
     if chunks:
-        # Hard coverage check: captions should cover from 0 to video end with no major gaps.
         max_gap = 0.0
         last_end = 0.0
         for chunk in chunks:
@@ -259,7 +264,7 @@ def _caption_overlay_clips(word_timings: List[Dict], total_duration: float, outp
         if max_gap > 0.75:
             raise RuntimeError(f"Caption coverage failed: max caption gap is {max_gap:.2f}s")
 
-    logger.info(f"Created {len(clips)} caption overlay clips from {len(word_timings)} word timings")
+    logger.info(f"Created {len(clips)} caption overlay clips from {len(word_timings)} synced word timings")
     return clips, chunks
 
 
@@ -422,10 +427,7 @@ def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir
     import json
     metadata = {
         "visuals": [{"source": v["source"], "author": v["author"]} for v in visual_data],
-        "music": music_meta,
-        "caption_chunks": len(chunks),
-        "caption_coverage_seconds": total_duration,
-        "video_duration_seconds": total_duration
+        "music": music_meta
     }
     with open("output/metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

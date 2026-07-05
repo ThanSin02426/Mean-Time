@@ -4,10 +4,9 @@ import argparse
 import logging
 import random
 import re
-from typing import List, Tuple
+from typing import List
 
-# Pillow 10+ removed Image.ANTIALIAS, but MoviePy 1.0.3 still calls it.
-# Install the compatibility alias before importing MoviePy-heavy modules.
+# Pillow 10+ removed Image.ANTIALIAS, while MoviePy 1.0.3 still references it.
 try:
     from PIL import Image
     if not hasattr(Image, "ANTIALIAS"):
@@ -17,17 +16,16 @@ except Exception:
 
 from src.script_gen import generate_script
 from src.voiceover import generate_audio
+from src.subtitles import transcribe_audio_with_whisper
 from src.video_assembly import assemble_video
 from src.uploader import upload_video
 
-# Configure root logger
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("autoshorts")
-
 
 CATEGORY_KEYWORDS = {
     "space": ["space", "planet", "galaxy", "black hole", "nasa", "moon", "mars", "asteroid", "universe", "star", "solar"],
@@ -153,183 +151,168 @@ TOPIC_TEMPLATES = {
 
 
 def _normalize_topic_key(text: str) -> str:
-    lowered = text.lower()
+    lowered = str(text or "").lower()
     for category, keywords in CATEGORY_KEYWORDS.items():
         if any(k in lowered for k in keywords):
             return category
     return "general"
 
 
-def _topic_similarity_key(topic: str) -> str:
-    """Return a loose topic family key so the queue can cycle similar topics safely."""
-    return _normalize_topic_key(topic)
-
-
 def _clean_topic_line(line: str) -> str:
     return re.sub(r"\s+", " ", line.strip(" \t\n\r-•*0123456789.()[]"))
 
 
-def _generate_similar_topic(seed_topic: str, existing_topics: List[str], history_window: int = 10) -> str:
-    """
-    Append one similar topic at the end so the queue never ends.
-    The similar category returns only after the remaining queue cycles through,
-    which is normally about 10 iterations when topics.txt has 10 lines.
+def _generate_similar_topic(seed_topic: str, existing_topics: List[str]) -> str:
+    """Return a same-family topic that is appended at the END of the queue.
+
+    If topics.txt has around 10 lines, the same family naturally returns after the
+    rest of the queue has cycled, which matches the desired never-ending queue.
     """
     category = _normalize_topic_key(seed_topic)
     templates = TOPIC_TEMPLATES.get(category, TOPIC_TEMPLATES["general"])
     existing_lower = {t.lower().strip() for t in existing_topics}
-    recent_families = [_topic_similarity_key(t) for t in existing_topics[:history_window]]
-
-    # Prefer a non-duplicate topic from the same family that is not already in queue.
     start = abs(hash(seed_topic)) % len(templates)
     for offset in range(len(templates)):
         candidate = templates[(start + offset) % len(templates)]
         if candidate.lower() not in existing_lower and candidate.lower() != seed_topic.lower():
-            logger.info(f"Generated next queue topic from category '{category}': {candidate}")
+            logger.info(f"Generated replacement queue topic from category '{category}': {candidate}")
             return candidate
-
-    # If all templates are already present, create a deterministic variant.
-    variant_num = len(existing_topics) + random.randint(1, 99)
-    fallback = f"3 surprising {category} facts you will remember #{variant_num}"
-    logger.info(f"Generated fallback next queue topic: {fallback}")
-    return fallback
+    suffix = random.randint(10, 999)
+    return f"3 surprising {category} facts you will remember {suffix}"
 
 
 def pop_topic_and_refresh_queue(topics_file: str) -> str:
-    """
-    Pop the first topic, append a similar new topic at the end, and save the queue.
-    This keeps topics.txt as a never-ending queue for scheduled uploads.
-    """
     if not os.path.exists(topics_file):
         raise FileNotFoundError(f"Topics file not found: {topics_file}")
-
     with open(topics_file, "r", encoding="utf-8") as f:
         topics = [_clean_topic_line(line) for line in f.readlines()]
     topics = [t for t in topics if t]
-
     if not topics:
         raise RuntimeError(f"No topics found in {topics_file}")
 
     selected = topics.pop(0)
-    logger.info(f"Popped topic from queue: '{selected}'")
+    replacement = _generate_similar_topic(selected, topics)
+    topics.append(replacement)
 
-    next_topic = _generate_similar_topic(selected, topics, history_window=10)
-    topics.append(next_topic)
-
-    # Keep file readable and deterministic. Deduplicate while preserving order,
-    # but never remove the newly appended topic unless it is truly duplicated.
-    cleaned = []
-    seen = set()
-    for t in topics:
-        key = t.lower().strip()
+    # Keep order and remove accidental duplicate lines.
+    seen, final_topics = set(), []
+    for topic in topics:
+        key = topic.lower().strip()
         if key and key not in seen:
-            cleaned.append(t)
+            final_topics.append(topic)
             seen.add(key)
 
     with open(topics_file, "w", encoding="utf-8") as f:
-        for t in cleaned:
-            f.write(t + "\n")
+        for topic in final_topics:
+            f.write(topic + "\n")
 
-    logger.info(f"Updated topic queue: removed selected topic and appended '{next_topic}'")
+    logger.info(f"Popped topic from queue: '{selected}'")
+    logger.info(f"Appended replacement topic at queue end: '{replacement}'")
     return selected
 
 
+def _narration_text(script_data: dict) -> str:
+    full_text = str(script_data.get("script") or "").strip()
+    if full_text:
+        return full_text
+    scenes = script_data.get("scenes", [])
+    return " ".join(str(s.get("text", "")) for s in scenes).strip()
+
+
 def process_topic(topic, upload=True):
-    """Runs the full end-to-end pipeline for a single topic."""
     logger.info(f"=== Starting Pipeline for Topic: '{topic}' ===")
     temp_files = []
-
     try:
-        # 1. Script Generation
         script_data = generate_script(topic)
         title = script_data.get('title', 'YouTube Short')
         description = script_data.get('description', '')
         tags = script_data.get('tags', [])
         scenes = script_data.get('scenes', [])
-
-        # Extract full text for narration
-        full_text = script_data.get('script')
+        full_text = _narration_text(script_data)
         if not full_text:
-            full_text = " ".join([s.get('text', '') for s in scenes])
+            raise RuntimeError("Generated script/narration text is empty.")
 
-        # 2. Visuals Generation
-        image_dir = "temp_images"
         from src.visuals import generate_visuals
-        visual_data = generate_visuals(scenes, output_dir=image_dir, topic=topic)
-        image_paths = [v["path"] for v in visual_data]
-        temp_files.extend(image_paths)
+        visual_data = generate_visuals(scenes, output_dir="temp_images", topic=topic)
+        temp_files.extend([v["path"] for v in visual_data if os.path.exists(v.get("path", ""))])
         logger.info(f"Generated {len(visual_data)} visuals.")
 
-        # 3. Voiceover & Subtitles Generation
         audio_path = "temp_audio.mp3"
-        json_path = "temp_captions.json"
-
-        logger.info("Generating voiceover and capturing word boundaries...")
-        word_timings = generate_audio(full_text, audio_path, json_path)
-        temp_files.extend([audio_path, json_path])
-        logger.info(f"Audio saved to: {audio_path}")
-        logger.info(f"Captions/timing saved to: {json_path}")
-
-        # 4. Video Assembly
+        edge_json_path = "temp_edge_captions.json"
+        synced_json_path = "output/captions.json"
         os.makedirs("output", exist_ok=True)
+
+        logger.info("Generating TTS narration audio...")
+        edge_timings = generate_audio(full_text, audio_path, edge_json_path)
+        temp_files.extend([audio_path, edge_json_path])
+        logger.info(f"TTS audio saved to: {audio_path}")
+
+        logger.info("Generating synced subtitles from ACTUAL audio using Whisper/faster-whisper...")
+        word_timings = transcribe_audio_with_whisper(
+            audio_path=audio_path,
+            output_json_path=synced_json_path,
+            reference_text=full_text,
+        )
+        logger.info(f"Synced captions saved to: {synced_json_path} ({len(word_timings)} words)")
+        if len(word_timings) < max(5, int(len(full_text.split()) * 0.45)):
+            logger.warning("Synced caption word count is low; falling back to edge/even timings may have occurred.")
+
         output_video_path = "output/final_short.mp4"
         assemble_video(audio_path, word_timings, visual_data, output_video_path)
-
         if not os.path.exists(output_video_path):
-            logger.error(f"Failed to create final MP4 at {output_video_path}")
             raise FileNotFoundError(f"Video assembly failed to produce {output_video_path}")
 
         from moviepy.editor import VideoFileClip
         final_clip = VideoFileClip(output_video_path)
-        final_duration = final_clip.duration
+        final_duration = float(final_clip.duration)
         final_clip.close()
-
         file_size_mb = os.path.getsize(output_video_path) / (1024 * 1024)
-        word_count = len(word_timings)
+
+        try:
+            image_paths = [v["path"] for v in visual_data if v.get("type") == "image" and os.path.exists(v.get("path", ""))]
+            if image_paths:
+                from PIL import Image
+                thumb_w, thumb_h = 270, 480
+                contact = Image.new('RGB', (thumb_w * len(image_paths), thumb_h), (10, 10, 15))
+                for idx, imp in enumerate(image_paths):
+                    im = Image.open(imp).convert("RGB").resize((thumb_w, thumb_h))
+                    contact.paste(im, (idx * thumb_w, 0))
+                contact.save("output/debug_contact_sheet.jpg")
+        except Exception as exc:
+            logger.warning(f"Failed to create debug contact sheet: {exc}")
+
         logger.info("--- Pipeline Summary ---")
-        logger.info(f"Scenes Generated: {len(image_paths)}")
-        logger.info(f"Narration Words: {word_count}")
+        logger.info(f"Topic: {topic}")
+        logger.info(f"Scenes Generated: {len(visual_data)}")
+        logger.info(f"Narration Words: {len(full_text.split())}")
+        logger.info(f"Synced Caption Words: {len(word_timings)}")
         logger.info(f"Video Duration: {final_duration:.2f}s")
         logger.info(f"Output MP4: {output_video_path} ({file_size_mb:.2f} MB)")
 
-        # Generate Debug Contact Sheet
-        try:
-            img_paths = [v["path"] for v in visual_data if v["type"] == "image"]
-            if img_paths:
-                from PIL import Image
-                contact = Image.new('RGB', (1080 * len(img_paths), 1920))
-                for idx, imp in enumerate(img_paths):
-                    im = Image.open(imp).convert("RGB").resize((1080, 1920))
-                    contact.paste(im, (idx * 1080, 0))
-                contact.save("output/debug_contact_sheet.jpg")
-                logger.info("Debug contact sheet generated.")
-        except Exception as e:
-            logger.warning(f"Failed to create contact sheet: {e}")
-
-        # Quality Gate Check before Upload
-        logger.info("Running Quality Gate checks...")
-
         if final_duration > 58.0:
-            raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s). Shorts must be under 58s.")
-        if not image_paths:
+            raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s).")
+        if not visual_data:
             raise RuntimeError("Quality Gate Failed: No visual scenes were generated.")
-        if word_count == 0:
-            raise RuntimeError("Quality Gate Failed: Captions JSON has zero words.")
+        if not word_timings:
+            raise RuntimeError("Quality Gate Failed: Synced captions JSON has zero words.")
+        if file_size_mb < 0.5:
+            raise RuntimeError("Quality Gate Failed: Output MP4 is suspiciously small.")
 
         if upload:
             video_url = upload_video(output_video_path, title, description, tags)
-            if image_paths:
-                from src.uploader import upload_thumbnail
-                video_id = video_url.split('/')[-1]
-                upload_thumbnail(video_id, image_paths[0])
+            try:
+                if visual_data and visual_data[0].get("type") == "image":
+                    from src.uploader import upload_thumbnail
+                    video_id = video_url.split('/')[-1]
+                    upload_thumbnail(video_id, visual_data[0]["path"])
+            except Exception as exc:
+                logger.warning(f"Thumbnail upload skipped/failed: {exc}")
             logger.info(f"=== Pipeline Completed Successfully! URL: {video_url} ===")
         else:
-            logger.info(f"=== Pipeline Completed Successfully! Video saved locally to {output_video_path} (Upload skipped) ===")
-
+            logger.info(f"=== Pipeline Completed Successfully! Video saved to {output_video_path} (Upload skipped) ===")
     except Exception as e:
         logger.error(f"Pipeline failed: {e}", exc_info=True)
         raise
-
     finally:
         logger.info("Cleaning up temporary files...")
         for f in temp_files:
@@ -338,23 +321,29 @@ def process_topic(topic, upload=True):
                     os.remove(f)
                 except Exception as e:
                     logger.warning(f"Could not remove {f}: {e}")
-        if os.path.exists("temp_images") and not os.listdir("temp_images"):
-            os.rmdir("temp_images")
+        if os.path.exists("temp_images"):
+            try:
+                for p in os.listdir("temp_images"):
+                    pp = os.path.join("temp_images", p)
+                    if os.path.isfile(pp):
+                        os.remove(pp)
+                os.rmdir("temp_images")
+            except Exception:
+                pass
 
 
 def main():
     parser = argparse.ArgumentParser(description="AutoShorts: End-to-End YouTube Shorts Automation Pipeline")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--topic", type=str, help="Single topic to generate a short for")
-    group.add_argument("--topics-file", type=str, help="File containing a queue of topics. The first topic is used, removed, and replaced with a similar new topic.")
-    parser.add_argument("--no-upload", action="store_true", help="Skip YouTube upload and save video locally")
+    group.add_argument("--topics-file", type=str, help="Topic queue file. First topic is used, then replaced at the end.")
+    parser.add_argument("--no-upload", action="store_true", help="Skip YouTube upload and save artifact locally")
     args = parser.parse_args()
 
     if args.topic:
-        topic = args.topic
+        topic = args.topic.strip()
     else:
         topic = pop_topic_and_refresh_queue(args.topics_file)
-
     process_topic(topic, upload=not args.no_upload)
 
 
