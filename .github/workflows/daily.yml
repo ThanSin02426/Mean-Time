@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: 'Topic for the video (leave empty to pick randomly from topics.txt)'
+        description: 'Topic for the video (leave empty to use topics.txt queue)'
         required: false
         type: string
       publish:
-        description: 'Upload to YouTube?'
+        description: 'Upload to YouTube? false = artifact download only'
         required: false
         type: boolean
         default: false
@@ -45,13 +45,12 @@ jobs:
         path: |
           ~/.cache/huggingface
           ~/.cache/torch
-        key: whisper-cache-v1-${{ runner.os }}
+        key: whisper-cache-v2-${{ runner.os }}
 
     - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core libgomp1
-        # ImageMagick is installed only for compatibility. Captions are rendered with PIL, not TextClip.
 
     - name: Install Python dependencies
       run: |
@@ -61,7 +60,7 @@ jobs:
     - name: Run AutoShorts Pipeline
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || vars.GEMINI_API_KEY }}
-        GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || vars.GEMINI_MODEL }}
+        GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
         YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
         YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
@@ -70,37 +69,56 @@ jobs:
         WHISPER_MODEL: ${{ secrets.WHISPER_MODEL || vars.WHISPER_MODEL || 'tiny.en' }}
         WHISPER_DEVICE: cpu
         WHISPER_COMPUTE_TYPE: int8
-        CAPTION_LEAD_SECONDS: "0.0"
-        ENABLE_ANALYTICS_SYNC: "true"
-        MIN_ANALYTICS_AGE_HOURS: "48"
-        PREFERRED_ANALYTICS_AGE_HOURS: "72"
-        NICHE_REPEAT_DISTANCE: "10"
-        EXPLORATION_RATE: "0.20"
+        CAPTION_LEAD_SECONDS: '0.0'
+        MIN_SCRIPT_WORDS: '95'
+        MAX_SCRIPT_WORDS: '130'
+        MIN_NARRATION_WORDS: '95'
+        MIN_FINAL_DURATION_SECONDS: '30'
+        MAX_FINAL_DURATION_SECONDS: '58'
+        ENABLE_ANALYTICS_SYNC: 'false'
         PYTHONPATH: .
-        WORKFLOW_TOPIC: ${{ github.event.inputs.topic }}
+        WORKFLOW_TOPIC: ${{ inputs.topic }}
+        WORKFLOW_PUBLISH: ${{ inputs.publish }}
       run: |
+        set -euo pipefail
         ARGS=()
 
-        # Determine topic argument
-        if [ -n "$WORKFLOW_TOPIC" ]; then
+        if [ -n "${WORKFLOW_TOPIC:-}" ]; then
           ARGS+=(--topic "$WORKFLOW_TOPIC")
         else
           ARGS+=(--topics-file "topics.txt")
         fi
 
-        # Determine publish argument (default is to publish if schedule, or if publish is true on dispatch)
-        if [ "${{ github.event_name }}" != "schedule" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
+        # Scheduled runs publish automatically. Manual runs publish only when publish=true.
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${WORKFLOW_PUBLISH:-false}" != "true" ]; then
           ARGS+=(--no-upload)
         fi
 
-        # Best-effort analytics sync first; never block video generation.
-        python src/main.py --sync-analytics || echo "::warning::Analytics sync skipped or failed"
-
-        # Run the command securely
+        echo "Event: ${{ github.event_name }}"
+        echo "Topic input: ${WORKFLOW_TOPIC:-<queue>}"
+        echo "Publish input: ${WORKFLOW_PUBLISH:-false}"
+        echo "Command: python src/main.py ${ARGS[*]}"
         python src/main.py "${ARGS[@]}"
 
-    - name: Upload Artifacts (if not published)
-      if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'false'
+    - name: Final debug summary
+      if: always()
+      run: |
+        echo "Event: ${{ github.event_name }}"
+        echo "Topic input: ${{ inputs.topic }}"
+        echo "Publish input: ${{ inputs.publish }}"
+        echo "PWD: $(pwd)"
+        echo "Output directory:"
+        ls -lah output || true
+        if [ -f output/final_short.mp4 ]; then
+          echo "MP4 exists: yes"
+          echo "MP4 size bytes: $(stat -c%s output/final_short.mp4)"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 output/final_short.mp4 || true
+        else
+          echo "MP4 exists: no"
+        fi
+
+    - name: Upload Artifacts (manual not published)
+      if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
       uses: actions/upload-artifact@v4
       with:
         name: generated-short
@@ -109,18 +127,20 @@ jobs:
           autoshorts-pipeline/output/metadata.json
           autoshorts-pipeline/output/debug_contact_sheet.jpg
           autoshorts-pipeline/output/captions.json
+          autoshorts-pipeline/output/caption_timing_report.json
           autoshorts-pipeline/output/caption_sample_*.png
         if-no-files-found: error
 
     - name: Commit queue updates
-      if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.topic == '')
+      if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.topic == '') }}
       continue-on-error: true
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add topics.txt topic_bank.json topic_state.json analytics_history.json niche_scores.json upload_history.json || true
-        # Only commit if there are changes
-        if ! git diff --quiet || ! git diff --staged --quiet; then
+        if ! git diff --cached --quiet; then
           git commit -m "chore: update topics queue"
-          git push || echo "::warning::Write access to repository not granted. Please enable Read and write permissions in GitHub Settings."
+          git push || echo "::warning::Write access to repository not granted. Enable Read and write permissions in GitHub Settings > Actions > General."
+        else
+          echo "No queue changes to commit."
         fi

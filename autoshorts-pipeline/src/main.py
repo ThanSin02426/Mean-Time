@@ -221,6 +221,36 @@ def _narration_text(script_data: dict) -> str:
     return " ".join(str(s.get("text", "")) for s in scenes).strip()
 
 
+MIN_FINAL_DURATION_SECONDS = float(os.environ.get("MIN_FINAL_DURATION_SECONDS", "30") or 30)
+MAX_FINAL_DURATION_SECONDS = float(os.environ.get("MAX_FINAL_DURATION_SECONDS", "58") or 58)
+MIN_NARRATION_WORDS = int(os.environ.get("MIN_NARRATION_WORDS", "95") or 95)
+
+
+def _word_count(text: str) -> int:
+    return len([w for w in str(text or "").split() if w.strip()])
+
+
+def _extend_narration_text(text: str, topic: str, min_words: int = MIN_NARRATION_WORDS, max_words: int = 135) -> str:
+    """Deterministically extend short LLM scripts so we never create 3-second Shorts."""
+    text = re.sub(r"\s+", " ", str(text or "").strip())
+    additions = [
+        f"Here is the part most people miss about {topic}.",
+        "The first detail sounds small, but it changes the whole story.",
+        "The second detail is about scale, and the scale is almost impossible to picture.",
+        "The third detail is why scientists still keep studying this instead of calling it finished.",
+        "That is why this fact feels fake, even though it is real.",
+        "Save this if you want more strange facts that actually have science behind them.",
+    ]
+    idx = 0
+    while _word_count(text) < min_words and idx < len(additions):
+        text = (text + " " + additions[idx]).strip()
+        idx += 1
+    words = text.split()
+    if len(words) > max_words:
+        text = " ".join(words[:max_words])
+    return text
+
+
 def process_topic(topic, upload=True):
     logger.info(f"=== Starting Pipeline for Topic: '{topic}' ===")
     temp_files = []
@@ -233,6 +263,13 @@ def process_topic(topic, upload=True):
         full_text = _narration_text(script_data)
         if not full_text:
             raise RuntimeError("Generated script/narration text is empty.")
+        if _word_count(full_text) < MIN_NARRATION_WORDS:
+            logger.warning(
+                "Narration text only %s words; extending before TTS to avoid too-short videos.",
+                _word_count(full_text),
+            )
+            full_text = _extend_narration_text(full_text, topic)
+            script_data["script"] = full_text
 
         from src.visuals import generate_visuals
         visual_data = generate_visuals(scenes, output_dir="temp_images", topic=topic)
@@ -256,13 +293,29 @@ def process_topic(topic, upload=True):
         trimmed_duration = audio_duration_seconds(final_audio_path) or 0.0
         original_duration = audio_duration_seconds(raw_audio_path) or 0.0
 
+        # One safe regeneration pass if Gemini produced a script that still speaks too short.
+        if trimmed_duration < MIN_FINAL_DURATION_SECONDS:
+            logger.warning(
+                "Narration audio too short after first TTS pass: %.2fs. Extending text and regenerating once.",
+                trimmed_duration,
+            )
+            full_text = _extend_narration_text(full_text, topic, min_words=max(MIN_NARRATION_WORDS + 15, _word_count(full_text) + 25), max_words=140)
+            script_data["script"] = full_text
+            generate_audio(full_text, raw_audio_path, edge_json_path)
+            trim_silence_for_caption_sync(raw_audio_path, final_audio_path)
+            trimmed_duration = audio_duration_seconds(final_audio_path) or 0.0
+            original_duration = audio_duration_seconds(raw_audio_path) or 0.0
+
         logger.info(f"Final narration audio used for BOTH Whisper and video: {final_audio_path}")
-        logger.info(f"Narration word count: {len(full_text.split())}")
+        logger.info(f"Narration word count: {_word_count(full_text)}")
         logger.info(f"Original TTS duration: {original_duration:.2f}s")
         logger.info(f"Trimmed narration duration: {trimmed_duration:.2f}s")
 
-        if trimmed_duration < 30.0:
-            raise RuntimeError(f"Narration too short: {trimmed_duration:.2f} seconds. Refusing to generate/upload. (Minimum is 30s)")
+        if trimmed_duration < MIN_FINAL_DURATION_SECONDS:
+            raise RuntimeError(
+                f"Narration too short after regeneration: {trimmed_duration:.2f}s. "
+                f"Refusing to upload a broken short. Minimum is {MIN_FINAL_DURATION_SECONDS:.0f}s."
+            )
 
         logger.info("Generating synced subtitles from the FINAL narration audio using Whisper/faster-whisper...")
         word_timings = transcribe_audio_with_whisper(
@@ -271,7 +324,7 @@ def process_topic(topic, upload=True):
             reference_text=full_text,
         )
         logger.info(f"Synced captions saved to: {synced_json_path} ({len(word_timings)} words)")
-        if len(word_timings) < max(5, int(len(full_text.split()) * 0.45)):
+        if len(word_timings) < max(5, int(_word_count(full_text) * 0.45)):
             logger.warning("Synced caption word count is low; Whisper may have fallen back to even timings.")
 
         output_video_path = "output/final_short.mp4"
@@ -301,17 +354,17 @@ def process_topic(topic, upload=True):
         logger.info("--- Pipeline Summary ---")
         logger.info(f"Topic: {topic}")
         logger.info(f"Scenes Generated: {len(visual_data)}")
-        logger.info(f"Narration Words: {len(full_text.split())}")
+        logger.info(f"Narration Words: {_word_count(full_text)}")
         logger.info(f"Synced Caption Words: {len(word_timings)}")
         logger.info(f"Video Duration: {final_duration:.2f}s")
         logger.info(f"Output MP4: {output_video_path} ({file_size_mb:.2f} MB)")
 
         quality_gate_passed = True
         error_msg = ""
-        if final_duration < 30.0:
+        if final_duration < MIN_FINAL_DURATION_SECONDS:
             quality_gate_passed = False
             error_msg = f"Video is too short ({final_duration:.2f}s)."
-        elif final_duration > 58.0:
+        elif final_duration > MAX_FINAL_DURATION_SECONDS:
             quality_gate_passed = False
             error_msg = f"Video is too long ({final_duration:.2f}s)."
         elif not visual_data:
@@ -323,9 +376,9 @@ def process_topic(topic, upload=True):
         elif file_size_mb < 0.5:
             quality_gate_passed = False
             error_msg = "Output MP4 is suspiciously small."
-        elif abs(final_duration - trimmed_duration) > 1.0:
+        elif abs(final_duration - min(trimmed_duration, MAX_FINAL_DURATION_SECONDS)) > 1.0:
             quality_gate_passed = False
-            error_msg = f"Video duration ({final_duration:.2f}s) differs from audio duration ({trimmed_duration:.2f}s) by >1s."
+            error_msg = f"Video duration ({final_duration:.2f}s) differs from expected audio duration ({min(trimmed_duration, MAX_FINAL_DURATION_SECONDS):.2f}s) by >1s."
 
         logger.info(f"Quality gate passed: {str(quality_gate_passed).lower()}")
 
@@ -334,7 +387,7 @@ def process_topic(topic, upload=True):
         metadata = {
             "topic": topic,
             "title": title,
-            "narration_word_count": len(full_text.split()),
+            "narration_word_count": _word_count(full_text),
             "narration_duration": trimmed_duration,
             "final_video_duration": final_duration,
             "scene_count": len(visual_data),

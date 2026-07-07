@@ -233,3 +233,24 @@ Manual workflow runs should stay simple:
 - `publish`: `false` gives a downloadable artifact; `true` uploads to YouTube.
 
 Scheduled runs use `topics.txt` and publish automatically.
+
+## Current Stable Workflow Notes
+
+The workflow UI intentionally has only two manual inputs:
+
+- `topic`: optional. Leave empty to use the `topics.txt` queue.
+- `publish`: `false` creates a downloadable artifact; `true` uploads to YouTube.
+
+Scheduled runs publish automatically twice daily: 09:00 AM IST and 07:30 PM IST.
+
+Safety gates are active. The pipeline refuses to upload broken Shorts if:
+
+- narration is under 30 seconds,
+- final MP4 is under 30 seconds or over 58 seconds,
+- captions are missing,
+- MP4 duration does not match narration duration,
+- the output file is suspiciously small.
+
+The final video duration is controlled by the final narration audio duration, not by the length of a stock video clip. If a stock clip is short, it is looped or extended to fill its scene.
+
+Analytics optimization is currently disabled by default (`ENABLE_ANALYTICS_SYNC=false`). We will observe performance manually first.
