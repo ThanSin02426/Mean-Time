@@ -210,25 +210,44 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
 
     td = float(total_duration) if total_duration is not None else None
     lead = float(os.environ.get("CAPTION_LEAD_SECONDS", "0.0") or 0.0)
+    lead = max(0.0, min(lead, 0.15))
+
     for i, chunk in enumerate(raw_chunks):
-        # Keep captions anchored to Whisper timestamps. Default lead is zero to avoid captions
-        # appearing before the spoken audio. Users can tune CAPTION_LEAD_SECONDS if needed.
-        if i == 0:
-            chunk["start"] = max(0.0, min(chunk["start"], 0.15) - lead)
-        else:
-            chunk["start"] = max(0.0, chunk["start"] - lead)
+        # Speech-aware policy: captions start at the first spoken word timestamp.
+        # Do not pin the first caption to 0.0; that caused the stale subtitle hold bug.
+        chunk["start"] = max(0.0, float(chunk["start"]) - lead)
 
         if i < len(raw_chunks) - 1:
-            next_start = max(chunk["start"] + 0.45, raw_chunks[i + 1]["start"] - lead)
-            chunk["end"] = next_start
+            next_raw_start = float(raw_chunks[i + 1]["start"])
+            gap_to_next = max(0.0, next_raw_start - float(chunk["natural_end"]))
+            if gap_to_next <= 0.35:
+                # Tiny pauses are normal in speech; keep captions present through them.
+                chunk["end"] = max(chunk["start"] + 0.45, next_raw_start - lead)
+            else:
+                # Long silence: do not hold stale captions across it.
+                chunk["end"] = max(chunk["start"] + 0.45, float(chunk["natural_end"]) + 0.22)
         else:
-            chunk["end"] = max(chunk["natural_end"] + 0.35, td if td is not None else chunk["natural_end"] + 0.35)
+            # Final caption ends shortly after the final spoken word, not at full video end.
+            chunk["end"] = max(chunk["start"] + 0.45, float(chunk["natural_end"]) + 0.35)
 
         if td is not None:
             chunk["start"] = min(chunk["start"], max(0.0, td - 0.35))
             chunk["end"] = min(max(chunk["end"], chunk["start"] + 0.45), td)
         if chunk["end"] <= chunk["start"]:
             chunk["end"] = chunk["start"] + 0.45
+
+    # Validate the exact bug we are fixing.
+    first_word_start = float(cleaned[0]["start"])
+    first_caption_start = float(raw_chunks[0]["start"])
+    if first_word_start - first_caption_start > 0.25:
+        raise RuntimeError(
+            f"Caption timing failed: first caption starts {first_word_start - first_caption_start:.2f}s "
+            f"before the first spoken word ({first_caption_start:.2f}s vs {first_word_start:.2f}s)."
+        )
+    logger.info(
+        "Caption timing anchors: first_word_start=%.2fs first_caption_start=%.2fs last_word_end=%.2fs",
+        first_word_start, first_caption_start, float(cleaned[-1]["end"]),
+    )
 
     return raw_chunks
 
@@ -255,16 +274,18 @@ def _caption_overlay_clips(word_timings: List[Dict], total_duration: float, outp
                 logger.warning(f"Could not save caption sample {idx}: {exc}")
 
     if chunks:
-        max_gap = 0.0
-        last_end = 0.0
-        for chunk in chunks:
-            max_gap = max(max_gap, max(0.0, float(chunk["start"]) - last_end))
-            last_end = max(last_end, float(chunk["end"]))
-        tail_gap = max(0.0, float(total_duration) - last_end)
-        max_gap = max(max_gap, tail_gap)
-        logger.info(f"Caption coverage: {len(chunks)} chunks, max gap {max_gap:.2f}s, end {last_end:.2f}/{total_duration:.2f}s")
-        if max_gap > 0.75:
-            raise RuntimeError(f"Caption coverage failed: max caption gap is {max_gap:.2f}s")
+        inter_caption_gap = 0.0
+        for prev, cur in zip(chunks, chunks[1:]):
+            inter_caption_gap = max(inter_caption_gap, max(0.0, float(cur["start"]) - float(prev["end"])))
+        first_start = float(chunks[0]["start"])
+        last_end = float(chunks[-1]["end"])
+        logger.info(
+            f"Caption coverage: {len(chunks)} chunks | first caption {first_start:.2f}s | "
+            f"last caption {last_end:.2f}s | max silent caption gap {inter_caption_gap:.2f}s | video {total_duration:.2f}s"
+        )
+        # Long gaps are allowed when Whisper detects real silence. We only fail for impossible timings.
+        if first_start < -0.01 or last_end > float(total_duration) + 0.05:
+            raise RuntimeError("Caption timing failed: caption timestamps outside video duration.")
 
     logger.info(f"Created {len(clips)} caption overlay clips from {len(word_timings)} synced word timings")
     return clips, chunks

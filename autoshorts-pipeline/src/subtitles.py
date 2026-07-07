@@ -123,10 +123,29 @@ def transcribe_audio_with_whisper(
         logger.warning("Whisper returned zero words; using even fallback timings.")
         words = _fallback_even_timings(reference_text, duration)
 
+    # Do NOT force the first word to 0.0 or the last word to the full duration.
+    # Captions must be speech-aware: no stale first caption during leading silence, and
+    # no final caption held after narration ends.
     if duration is not None and words:
-        # Stabilize first/last coverage without shifting spoken word order.
-        words[0]["start"] = max(0.0, min(words[0]["start"], 0.15))
-        words[-1]["end"] = min(duration, max(words[-1]["end"], duration - 0.05))
+        first_word_start = float(words[0]["start"])
+        last_word_end = float(words[-1]["end"])
+        logger.info(
+            "Whisper timing report: audio %.2fs | first word %.2fs | last word %.2fs",
+            float(duration), first_word_start, last_word_end,
+        )
+        try:
+            report_path = os.path.join(os.path.dirname(output_json_path) or ".", "caption_timing_report.json")
+            with open(report_path, "w", encoding="utf-8") as rf:
+                json.dump({
+                    "audio_path": audio_path,
+                    "audio_duration_seconds": duration,
+                    "first_word_start_seconds": first_word_start,
+                    "last_word_end_seconds": last_word_end,
+                    "word_count": len(words),
+                    "source": words[0].get("source"),
+                }, rf, indent=2)
+        except Exception as exc:
+            logger.warning(f"Could not write caption timing report: {exc}")
 
     with open(output_json_path, "w", encoding="utf-8") as f:
         json.dump(words, f, indent=2, ensure_ascii=False)

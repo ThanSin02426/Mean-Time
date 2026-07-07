@@ -19,6 +19,8 @@ from src.voiceover import generate_audio
 from src.subtitles import transcribe_audio_with_whisper
 from src.video_assembly import assemble_video
 from src.uploader import upload_video
+from src.audio_utils import trim_silence_for_caption_sync, audio_duration_seconds
+from src import topic_engine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -237,28 +239,34 @@ def process_topic(topic, upload=True):
         temp_files.extend([v["path"] for v in visual_data if os.path.exists(v.get("path", ""))])
         logger.info(f"Generated {len(visual_data)} visuals.")
 
-        audio_path = "temp_audio.mp3"
+        raw_audio_path = "temp_audio_raw.mp3"
+        final_audio_path = "output/narration_final.mp3"
         edge_json_path = "temp_edge_captions.json"
         synced_json_path = "output/captions.json"
         os.makedirs("output", exist_ok=True)
 
         logger.info("Generating TTS narration audio...")
-        edge_timings = generate_audio(full_text, audio_path, edge_json_path)
-        temp_files.extend([audio_path, edge_json_path])
-        logger.info(f"TTS audio saved to: {audio_path}")
+        generate_audio(full_text, raw_audio_path, edge_json_path)
+        temp_files.extend([raw_audio_path, edge_json_path])
+        logger.info(f"Raw TTS audio saved to: {raw_audio_path}")
 
-        logger.info("Generating synced subtitles from ACTUAL audio using Whisper/faster-whisper...")
+        # Critical sync fix: trim silence first, then transcribe the exact audio used in the video.
+        trim_silence_for_caption_sync(raw_audio_path, final_audio_path)
+        logger.info(f"Final narration audio used for BOTH Whisper and video: {final_audio_path}")
+        logger.info(f"Final narration duration: {audio_duration_seconds(final_audio_path) or 0:.2f}s")
+
+        logger.info("Generating synced subtitles from the FINAL narration audio using Whisper/faster-whisper...")
         word_timings = transcribe_audio_with_whisper(
-            audio_path=audio_path,
+            audio_path=final_audio_path,
             output_json_path=synced_json_path,
             reference_text=full_text,
         )
         logger.info(f"Synced captions saved to: {synced_json_path} ({len(word_timings)} words)")
         if len(word_timings) < max(5, int(len(full_text.split()) * 0.45)):
-            logger.warning("Synced caption word count is low; falling back to edge/even timings may have occurred.")
+            logger.warning("Synced caption word count is low; Whisper may have fallen back to even timings.")
 
         output_video_path = "output/final_short.mp4"
-        assemble_video(audio_path, word_timings, visual_data, output_video_path)
+        assemble_video(final_audio_path, word_timings, visual_data, output_video_path)
         if not os.path.exists(output_video_path):
             raise FileNotFoundError(f"Video assembly failed to produce {output_video_path}")
 
@@ -301,6 +309,10 @@ def process_topic(topic, upload=True):
         if upload:
             video_url = upload_video(output_video_path, title, description, tags)
             try:
+                topic_engine.record_uploaded_video(video_url, title, topic)
+            except Exception as exc:
+                logger.warning(f"Could not record upload history for analytics queue: {exc}")
+            try:
                 if visual_data and visual_data[0].get("type") == "image":
                     from src.uploader import upload_thumbnail
                     video_id = video_url.split('/')[-1]
@@ -334,16 +346,24 @@ def process_topic(topic, upload=True):
 
 def main():
     parser = argparse.ArgumentParser(description="AutoShorts: End-to-End YouTube Shorts Automation Pipeline")
-    group = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument("--sync-analytics", action="store_true", help="Best-effort sync of matured YouTube stats into analytics_history.json")
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--topic", type=str, help="Single topic to generate a short for")
-    group.add_argument("--topics-file", type=str, help="Topic queue file. First topic is used, then replaced at the end.")
+    group.add_argument("--topics-file", type=str, help="Topic queue file. First topic is used, then analytics-aware replacement is appended.")
     parser.add_argument("--no-upload", action="store_true", help="Skip YouTube upload and save artifact locally")
     args = parser.parse_args()
 
+    if args.sync_analytics:
+        topic_engine.sync_analytics_if_possible()
+        if not args.topic and not args.topics_file:
+            return
+
     if args.topic:
         topic = args.topic.strip()
+    elif args.topics_file:
+        topic = topic_engine.pop_topic_and_refresh_queue(args.topics_file)
     else:
-        topic = pop_topic_and_refresh_queue(args.topics_file)
+        parser.error("Either --topic, --topics-file, or --sync-analytics must be provided.")
     process_topic(topic, upload=not args.no_upload)
 
 

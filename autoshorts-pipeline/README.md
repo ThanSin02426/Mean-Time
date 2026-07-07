@@ -158,3 +158,78 @@ python src/main.py --topic "3 strange facts about the ocean" --no-upload
 - Visuals use Pexels first, Pixabay fallback, NASA for space topics, and local designed slides as the final fallback.
 
 If a run fails during startup with an import error, confirm `requirements.txt` was installed and that no unused packages such as `webvtt` are imported.
+
+## Important: Subtitle Sync Architecture
+
+The pipeline now uses a speech-aware subtitle pipeline inspired by MoneyPrinter-style systems:
+
+1. Generate the TTS narration audio.
+2. Trim leading/trailing silence with ffmpeg.
+3. Save the final narration file at `output/narration_final.mp3`.
+4. Transcribe that exact final audio with `faster-whisper` and `word_timestamps=True`.
+5. Burn captions from `output/captions.json`.
+
+This is important: captions are not forced to start at `0.0s`. The first caption starts at the first spoken word timestamp, so a caption will not sit on screen before the voice begins. Small pauses under about 0.35s are bridged, but long silent gaps are allowed to have no caption.
+
+Useful tuning variables:
+
+```env
+CAPTION_LEAD_SECONDS=0.0
+SILENCE_THRESHOLD_DB=-50dB
+SILENCE_START_DURATION=0.12
+SILENCE_STOP_DURATION=0.18
+```
+
+Keep `CAPTION_LEAD_SECONDS=0.0` unless captions feel consistently late.
+
+## Analytics-Driven Never-Ending Topic Queue
+
+The workflow still uses `topics.txt` as the active queue. When the queue is used:
+
+1. The first topic is selected.
+2. That topic is removed from the top.
+3. A replacement topic is generated and appended to the bottom.
+4. The same niche is avoided for about 10 queue iterations when possible.
+5. The system uses an 80/20 strategy:
+   - 80%: exploit niches that perform well.
+   - 20%: explore new/out-of-the-box niches.
+
+The topic engine writes these files:
+
+```text
+topic_bank.json
+analytics_history.json
+niche_scores.json
+topic_state.json
+upload_history.json
+```
+
+Videos younger than 48 hours are ignored for scoring so the system gives each Short time to perform. The preferred evaluation age is 72 hours.
+
+Environment variables:
+
+```env
+ENABLE_ANALYTICS_SYNC=true
+MIN_ANALYTICS_AGE_HOURS=48
+PREFERRED_ANALYTICS_AGE_HOURS=72
+NICHE_REPEAT_DISTANCE=10
+EXPLORATION_RATE=0.20
+```
+
+Analytics sync is best-effort. If YouTube stats cannot be fetched, video generation still continues and the queue uses local fallback scoring.
+
+Manual analytics sync:
+
+```bash
+cd autoshorts-pipeline
+python src/main.py --sync-analytics
+```
+
+## Workflow Inputs
+
+Manual workflow runs should stay simple:
+
+- `topic`: optional. If empty, the workflow uses `topics.txt`.
+- `publish`: `false` gives a downloadable artifact; `true` uploads to YouTube.
+
+Scheduled runs use `topics.txt` and publish automatically.

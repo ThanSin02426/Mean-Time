@@ -71,6 +71,11 @@ jobs:
         WHISPER_DEVICE: cpu
         WHISPER_COMPUTE_TYPE: int8
         CAPTION_LEAD_SECONDS: "0.0"
+        ENABLE_ANALYTICS_SYNC: "true"
+        MIN_ANALYTICS_AGE_HOURS: "48"
+        PREFERRED_ANALYTICS_AGE_HOURS: "72"
+        NICHE_REPEAT_DISTANCE: "10"
+        EXPLORATION_RATE: "0.20"
         PYTHONPATH: .
         WORKFLOW_TOPIC: ${{ github.event.inputs.topic }}
       run: |
@@ -87,6 +92,9 @@ jobs:
         if [ "${{ github.event_name }}" != "schedule" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
           ARGS+=(--no-upload)
         fi
+
+        # Best-effort analytics sync first; never block video generation.
+        python src/main.py --sync-analytics || echo "::warning::Analytics sync skipped or failed"
 
         # Run the command securely
         python src/main.py "${ARGS[@]}"
@@ -110,7 +118,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add topics.txt
+        git add topics.txt topic_bank.json topic_state.json analytics_history.json niche_scores.json upload_history.json || true
         # Only commit if there are changes
         if ! git diff --quiet || ! git diff --staged --quiet; then
           git commit -m "chore: update topics queue"
