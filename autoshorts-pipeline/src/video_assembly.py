@@ -391,7 +391,10 @@ def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir
     padding = 0.25
     n = len(visual_data)
     scene_duration = (total_duration + (n - 1) * padding) / n
-    logger.info(f"Video duration: {total_duration:.2f}s | Scenes: {n} | Scene duration: {scene_duration:.2f}s | Crossfade: {padding}s")
+
+    logger.info(f"Narration duration: {total_duration:.2f}s")
+    logger.info(f"Scene count: {n}")
+    logger.info(f"Scene duration: {scene_duration:.2f}s")
 
     visual_clips = []
     temp_resized = []
@@ -403,17 +406,24 @@ def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir
         if mtype == "video":
             from moviepy.editor import VideoFileClip
             clip = VideoFileClip(path).without_audio()
+            original_media_duration = clip.duration
+            # Strict logic: NEVER let a stock video clip truncate the total scene duration.
+            # If the video is shorter than the needed scene duration, we loop it.
             if clip.duration < scene_duration:
                 # Import required here since it was missing at top level
                 from moviepy.editor import concatenate_videoclips
-                repeats = int(scene_duration // clip.duration) + 1
+                repeats = int(math.ceil(scene_duration / max(0.1, clip.duration)))
                 clip = concatenate_videoclips([clip] * repeats)
-            clip = clip.subclip(0, scene_duration)
+
+            # Explicitly force the clip duration so MoviePy composition uses exact math
+            clip = clip.subclip(0, scene_duration).set_duration(scene_duration)
+            logger.info(f"Source media {i+1} duration: {original_media_duration:.2f}s -> adjusted/looped to {clip.duration:.2f}s")
             clip = crop_video_to_vertical(clip)
         else:
             resized_path = resize_image_for_video(path)
             temp_resized.append(resized_path)
             clip = ImageClip(resized_path).set_duration(scene_duration)
+            logger.info(f"Source media {i+1} duration: image -> adjusted to {clip.duration:.2f}s")
             clip = apply_ken_burns(clip, scene_index=i)
 
         if i > 0:

@@ -48,14 +48,16 @@ def trim_silence_for_caption_sync(input_audio: str, output_audio: str) -> str:
     stop_dur = os.environ.get("SILENCE_STOP_DURATION", "0.18")
 
     # Keep MP3 output for compatibility with MoviePy/ffmpeg in the existing pipeline.
+    # We use a reliable areverse trick to trim trailing silence instead of `stop_periods=1` which can aggressively chop mid-audio.
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", input_audio,
         "-af",
         (
-            f"silenceremove="
-            f"start_periods=1:start_duration={start_dur}:start_threshold={threshold}:"
-            f"stop_periods=1:stop_duration={stop_dur}:stop_threshold={threshold}"
+            f"silenceremove=start_periods=1:start_duration={start_dur}:start_threshold={threshold},"
+            f"areverse,"
+            f"silenceremove=start_periods=1:start_duration={stop_dur}:start_threshold={threshold},"
+            f"areverse"
         ),
         "-ac", "1", "-ar", "44100", "-codec:a", "libmp3lame", "-q:a", "3",
         output_audio,

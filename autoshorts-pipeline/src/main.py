@@ -252,8 +252,17 @@ def process_topic(topic, upload=True):
 
         # Critical sync fix: trim silence first, then transcribe the exact audio used in the video.
         trim_silence_for_caption_sync(raw_audio_path, final_audio_path)
+
+        trimmed_duration = audio_duration_seconds(final_audio_path) or 0.0
+        original_duration = audio_duration_seconds(raw_audio_path) or 0.0
+
         logger.info(f"Final narration audio used for BOTH Whisper and video: {final_audio_path}")
-        logger.info(f"Final narration duration: {audio_duration_seconds(final_audio_path) or 0:.2f}s")
+        logger.info(f"Narration word count: {len(full_text.split())}")
+        logger.info(f"Original TTS duration: {original_duration:.2f}s")
+        logger.info(f"Trimmed narration duration: {trimmed_duration:.2f}s")
+
+        if trimmed_duration < 30.0:
+            raise RuntimeError(f"Narration too short: {trimmed_duration:.2f} seconds. Refusing to generate/upload. (Minimum is 30s)")
 
         logger.info("Generating synced subtitles from the FINAL narration audio using Whisper/faster-whisper...")
         word_timings = transcribe_audio_with_whisper(
@@ -297,17 +306,59 @@ def process_topic(topic, upload=True):
         logger.info(f"Video Duration: {final_duration:.2f}s")
         logger.info(f"Output MP4: {output_video_path} ({file_size_mb:.2f} MB)")
 
-        if final_duration > 58.0:
-            raise RuntimeError(f"Quality Gate Failed: Video is too long ({final_duration:.2f}s).")
-        if not visual_data:
-            raise RuntimeError("Quality Gate Failed: No visual scenes were generated.")
-        if not word_timings:
-            raise RuntimeError("Quality Gate Failed: Synced captions JSON has zero words.")
-        if file_size_mb < 0.5:
-            raise RuntimeError("Quality Gate Failed: Output MP4 is suspiciously small.")
+        quality_gate_passed = True
+        error_msg = ""
+        if final_duration < 30.0:
+            quality_gate_passed = False
+            error_msg = f"Video is too short ({final_duration:.2f}s)."
+        elif final_duration > 58.0:
+            quality_gate_passed = False
+            error_msg = f"Video is too long ({final_duration:.2f}s)."
+        elif not visual_data:
+            quality_gate_passed = False
+            error_msg = "No visual scenes were generated."
+        elif not word_timings:
+            quality_gate_passed = False
+            error_msg = "Synced captions JSON has zero words."
+        elif file_size_mb < 0.5:
+            quality_gate_passed = False
+            error_msg = "Output MP4 is suspiciously small."
+        elif abs(final_duration - trimmed_duration) > 1.0:
+            quality_gate_passed = False
+            error_msg = f"Video duration ({final_duration:.2f}s) differs from audio duration ({trimmed_duration:.2f}s) by >1s."
+
+        logger.info(f"Quality gate passed: {str(quality_gate_passed).lower()}")
+
+        # Save exact metadata as requested
+        import json
+        metadata = {
+            "topic": topic,
+            "title": title,
+            "narration_word_count": len(full_text.split()),
+            "narration_duration": trimmed_duration,
+            "final_video_duration": final_duration,
+            "scene_count": len(visual_data),
+            "scene_duration": final_duration / max(1, len(visual_data)),
+            "media_sources": [{"source": v.get("source"), "type": v.get("type")} for v in visual_data],
+            "quality_gate_passed": quality_gate_passed,
+            "upload_attempted": upload and quality_gate_passed,
+            "youtube_url": None
+        }
+        with open("output/metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        if not quality_gate_passed:
+            logger.error(f"Quality Gate Failed: {error_msg}")
+            raise RuntimeError(f"Quality Gate Failed: {error_msg}")
 
         if upload:
             video_url = upload_video(output_video_path, title, description, tags)
+
+            # Update metadata with YouTube URL
+            metadata["youtube_url"] = video_url
+            with open("output/metadata.json", "w") as f:
+                json.dump(metadata, f, indent=2)
+
             try:
                 topic_engine.record_uploaded_video(video_url, title, topic)
             except Exception as exc:
