@@ -30,117 +30,120 @@ jobs:
         working-directory: autoshorts-pipeline
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        cache: 'pip'
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
 
-    - name: Cache Whisper model
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/huggingface
-          ~/.cache/torch
-        key: whisper-cache-v2-${{ runner.os }}
+      - name: Cache Whisper model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/torch
+          key: whisper-cache-v2-${{ runner.os }}
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg imagemagick fonts-dejavu-core libgomp1
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core libgomp1
 
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Run AutoShorts Pipeline
-      env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || vars.GEMINI_API_KEY }}
-        GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
-        YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-        YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-        YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-        PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY || vars.PEXELS_API_KEY }}
-        PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY || vars.PIXABAY_API_KEY }}
-        WHISPER_MODEL: ${{ secrets.WHISPER_MODEL || vars.WHISPER_MODEL || 'tiny.en' }}
-        WHISPER_DEVICE: cpu
-        WHISPER_COMPUTE_TYPE: int8
-        CAPTION_LEAD_SECONDS: '0.0'
-        MIN_SCRIPT_WORDS: '95'
-        MAX_SCRIPT_WORDS: '130'
-        MIN_NARRATION_WORDS: '95'
-        MIN_FINAL_DURATION_SECONDS: '30'
-        MAX_FINAL_DURATION_SECONDS: '58'
-        ENABLE_ANALYTICS_SYNC: 'false'
-        PYTHONPATH: .
-        WORKFLOW_TOPIC: ${{ inputs.topic }}
-        WORKFLOW_PUBLISH: ${{ inputs.publish }}
-      run: |
-        set -euo pipefail
-        ARGS=()
+      - name: Run AutoShorts Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || vars.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL || vars.GEMINI_MODEL }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY || vars.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY || vars.PIXABAY_API_KEY }}
+          WHISPER_MODEL: ${{ secrets.WHISPER_MODEL || vars.WHISPER_MODEL || 'tiny.en' }}
+          WHISPER_DEVICE: cpu
+          WHISPER_COMPUTE_TYPE: int8
+          CAPTION_LEAD_SECONDS: '0.0'
+          ENABLE_ANALYTICS_SYNC: 'false'
+          MIN_NARRATION_WORDS: '95'
+          TARGET_NARRATION_WORDS: '108'
+          TARGET_MIN_NARRATION_WORDS: '100'
+          TARGET_MAX_NARRATION_WORDS: '125'
+          MIN_FINAL_DURATION_SECONDS: '30'
+          MAX_FINAL_DURATION_SECONDS: '58'
+          PYTHONPATH: .
+          WORKFLOW_TOPIC: ${{ inputs.topic || '' }}
+          WORKFLOW_PUBLISH: ${{ inputs.publish || false }}
+        run: |
+          set -euo pipefail
+          ARGS=()
 
-        if [ -n "${WORKFLOW_TOPIC:-}" ]; then
-          ARGS+=(--topic "$WORKFLOW_TOPIC")
-        else
-          ARGS+=(--topics-file "topics.txt")
-        fi
+          if [ -n "${WORKFLOW_TOPIC:-}" ]; then
+            ARGS+=(--topic "$WORKFLOW_TOPIC")
+          else
+            ARGS+=(--topics-file "topics.txt")
+          fi
 
-        # Scheduled runs publish automatically. Manual runs publish only when publish=true.
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${WORKFLOW_PUBLISH:-false}" != "true" ]; then
-          ARGS+=(--no-upload)
-        fi
+          # Scheduled runs publish automatically. Manual runs publish only when publish=true.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${WORKFLOW_PUBLISH}" != "true" ]; then
+            ARGS+=(--no-upload)
+          fi
 
-        echo "Event: ${{ github.event_name }}"
-        echo "Topic input: ${WORKFLOW_TOPIC:-<queue>}"
-        echo "Publish input: ${WORKFLOW_PUBLISH:-false}"
-        echo "Command: python src/main.py ${ARGS[*]}"
-        python src/main.py "${ARGS[@]}"
+          echo "event_name=${{ github.event_name }}"
+          echo "topic_input=${WORKFLOW_TOPIC:-<queue>}"
+          echo "publish_input=${WORKFLOW_PUBLISH}"
+          echo "command=python src/main.py ${ARGS[*]}"
+          python src/main.py "${ARGS[@]}"
 
-    - name: Final debug summary
-      if: always()
-      run: |
-        echo "Event: ${{ github.event_name }}"
-        echo "Topic input: ${{ inputs.topic }}"
-        echo "Publish input: ${{ inputs.publish }}"
-        echo "PWD: $(pwd)"
-        echo "Output directory:"
-        ls -lah output || true
-        if [ -f output/final_short.mp4 ]; then
-          echo "MP4 exists: yes"
-          echo "MP4 size bytes: $(stat -c%s output/final_short.mp4)"
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 output/final_short.mp4 || true
-        else
-          echo "MP4 exists: no"
-        fi
+      - name: Final debug summary
+        if: always()
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "topic_input=${{ inputs.topic || '' }}"
+          echo "publish_input=${{ inputs.publish || false }}"
+          if [ -f output/final_short.mp4 ]; then
+            echo "final_short_exists=true"
+            ls -lh output/final_short.mp4
+            ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 output/final_short.mp4 || true
+          else
+            echo "final_short_exists=false"
+          fi
+          if [ -f output/metadata.json ]; then
+            echo "metadata.json:"
+            cat output/metadata.json
+          fi
 
-    - name: Upload Artifacts (manual not published)
-      if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: generated-short
-        path: |
-          autoshorts-pipeline/output/final_short.mp4
-          autoshorts-pipeline/output/metadata.json
-          autoshorts-pipeline/output/debug_contact_sheet.jpg
-          autoshorts-pipeline/output/captions.json
-          autoshorts-pipeline/output/caption_timing_report.json
-          autoshorts-pipeline/output/caption_sample_*.png
-        if-no-files-found: error
+      - name: Upload Artifacts (manual publish=false only)
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-short
+          path: |
+            autoshorts-pipeline/output/final_short.mp4
+            autoshorts-pipeline/output/metadata.json
+            autoshorts-pipeline/output/audio_timing_report.json
+            autoshorts-pipeline/output/caption_timing_report.json
+            autoshorts-pipeline/output/debug_contact_sheet.jpg
+            autoshorts-pipeline/output/captions.json
+            autoshorts-pipeline/output/caption_sample_*.png
+          if-no-files-found: error
 
-    - name: Commit queue updates
-      if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.topic == '') }}
-      continue-on-error: true
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add topics.txt topic_bank.json topic_state.json analytics_history.json niche_scores.json upload_history.json || true
-        if ! git diff --cached --quiet; then
-          git commit -m "chore: update topics queue"
-          git push || echo "::warning::Write access to repository not granted. Enable Read and write permissions in GitHub Settings > Actions > General."
-        else
-          echo "No queue changes to commit."
-        fi
+      - name: Commit queue updates
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.topic == '' || inputs.topic == null)) }}
+        continue-on-error: true
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add topics.txt topic_bank.json topic_state.json analytics_history.json niche_scores.json upload_history.json || true
+          if ! git diff --quiet --cached; then
+            git commit -m "chore: update topics queue"
+            git push || echo "::warning::Write access not granted. Enable Settings > Actions > Workflow permissions > Read and write."
+          else
+            echo "No queue changes to commit."
+          fi
