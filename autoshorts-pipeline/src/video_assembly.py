@@ -117,8 +117,11 @@ def _make_caption_png(chunk: Dict, out_path: str, active_word_index: int = -1):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    font = _font(84, True)
-    small_font = _font(76, True)
+    # Caption size is intentionally smaller/cleaner than earlier bulky versions.
+    font_size = int(os.environ.get("CAPTION_FONT_SIZE", "60") or 60)
+    small_font_size = int(os.environ.get("CAPTION_SMALL_FONT_SIZE", "52") or 52)
+    font = _font(font_size, True)
+    small_font = _font(small_font_size, True)
     words = [w["word"].strip() for w in chunk["words"] if w.get("word", "").strip()]
     words = [w for w in words if w]
     if not words:
@@ -131,28 +134,29 @@ def _make_caption_png(chunk: Dict, out_path: str, active_word_index: int = -1):
         font = small_font
         lines = _wrap_words(words, font, 920, 2)
 
-    line_h = 100
-    pad_x, pad_y = 54, 34
+    line_h = int(os.environ.get("CAPTION_LINE_HEIGHT", "76") or 76)
+    pad_x, pad_y = 42, 26
     block_h = len(lines) * line_h + pad_y * 2
-    y0 = 1335  # safe bottom third
+    y0 = int(os.environ.get("CAPTION_Y", "1410") or 1410)  # safe bottom third
     max_line_w = max((_text_size(draw, line, font)[0] for line in lines), default=0)
     box_w = min(W - 110, max_line_w + pad_x * 2)
     x0 = (W - box_w) // 2
 
-    draw.rounded_rectangle((x0, y0, x0 + box_w, y0 + block_h), radius=42, fill=(0, 0, 0, 180), outline=(255, 215, 70, 160), width=3)
+    draw.rounded_rectangle((x0, y0, x0 + box_w, y0 + block_h), radius=34, fill=(0, 0, 0, 170), outline=(255, 215, 70, 120), width=2)
 
     # Draw by word so we can highlight current word approximately.
     word_counter = 0
     y = y0 + pad_y + 45
     for line in lines:
         line_words = line.split()
-        total_w = sum(_text_size(draw, w, font)[0] for w in line_words) + (len(line_words) - 1) * 24
+        spacing = 18
+        total_w = sum(_text_size(draw, w, font)[0] for w in line_words) + (len(line_words) - 1) * spacing
         x = (W - total_w) // 2
         for word in line_words:
             is_active = (word_counter == active_word_index) if active_word_index >= 0 else False
             fill = (255, 221, 66, 255) if is_active else (255, 255, 255, 255)
-            draw.text((x, y), word, font=font, fill=fill, anchor="lm", stroke_width=6, stroke_fill=(0, 0, 0, 245))
-            x += _text_size(draw, word, font)[0] + 24
+            draw.text((x, y), word, font=font, fill=fill, anchor="lm", stroke_width=4, stroke_fill=(0, 0, 0, 245))
+            x += _text_size(draw, word, font)[0] + spacing
             word_counter += 1
         y += line_h
 
@@ -166,11 +170,12 @@ def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration:
 
     Sync rule:
     - chunk start = first spoken word start, with tiny early lead
-    - chunk end = next chunk start, so captions remain present through pauses
-    - final chunk extends to the final video/audio duration
+    - chunk end usually reaches the next chunk start, so captions stay present during normal speech
+    - long real silences may have no caption
+    - final chunk ends shortly after the last spoken word
 
-    This keeps subtitles visible through the whole short while still changing only
-    when the spoken audio reaches the next phrase.
+    This fixes both issues: no stale first-caption hold before speech, and no missing captions
+    at the beginning of the spoken narration.
     """
     cleaned = []
     for w in word_timings:

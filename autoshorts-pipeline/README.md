@@ -233,3 +233,34 @@ Manual workflow runs should stay simple:
 - `publish`: `false` gives a downloadable artifact; `true` uploads to YouTube.
 
 Scheduled runs use `topics.txt` and publish automatically.
+
+
+## Final stability notes
+
+The workflow UI intentionally has only two inputs: `topic` and `publish`.
+
+- `publish=false` renders the MP4 and uploads a `generated-short` artifact.
+- `publish=true` renders the MP4 and uploads to YouTube only after duration/caption quality gates pass.
+- Leaving `topic` empty uses `topics.txt`: the first topic is removed and a new demand-style replacement is appended at the bottom.
+- Analytics optimization is disabled by default for now with `ENABLE_ANALYTICS_SYNC=false`; the queue still rotates niches and avoids repeating the same niche too quickly.
+
+Subtitle pipeline:
+
+1. Generate TTS.
+2. Trim leading/trailing silence.
+3. Transcribe the exact final narration audio with faster-whisper.
+4. Normalize small Whisper start delays so captions appear with the first spoken phrase.
+5. Burn smaller bottom-third captions into the final MP4.
+
+If captions feel early/late, tune these variables in GitHub Actions variables or `.env`:
+
+```env
+CAPTION_LEAD_SECONDS=0.0
+NORMALIZE_CAPTION_START=true
+MAX_CAPTION_START_SHIFT_SECONDS=1.25
+CAPTION_FONT_SIZE=60
+CAPTION_SMALL_FONT_SIZE=52
+CAPTION_Y=1410
+```
+
+Do not enable `publish=true` until a `publish=false` artifact has been checked.

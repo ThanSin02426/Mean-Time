@@ -123,7 +123,36 @@ def transcribe_audio_with_whisper(
         logger.warning("Whisper returned zero words; using even fallback timings.")
         words = _fallback_even_timings(reference_text, duration)
 
-    # Do NOT force the first word to 0.0 or the last word to the full duration.
+    # Normalize small Whisper start delays after we have already trimmed leading silence.
+    # The final video uses this exact trimmed audio file, so if Whisper starts the first
+    # word at 0.4s/0.8s while speech is clearly at the beginning, captions feel late.
+    # Shift timestamps left only for a bounded, configurable amount. Do not invent
+    # captions before real speech on untrimmed audio.
+    if duration is not None and words:
+        normalize = os.environ.get("NORMALIZE_CAPTION_START", "true").lower() in {"1", "true", "yes"}
+        max_shift = float(os.environ.get("MAX_CAPTION_START_SHIFT_SECONDS", "1.25") or 1.25)
+        desired_start = float(os.environ.get("DESIRED_FIRST_CAPTION_START_SECONDS", "0.05") or 0.05)
+        first_word_start = float(words[0]["start"])
+        if normalize and first_word_start > desired_start + 0.08:
+            shift = min(max_shift, max(0.0, first_word_start - desired_start))
+            logger.info(
+                "Normalizing caption timestamps left by %.2fs because first Whisper word started at %.2fs on trimmed audio.",
+                shift, first_word_start,
+            )
+            for w in words:
+                w["start"] = round(max(0.0, float(w["start"]) - shift), 3)
+                w["end"] = round(max(float(w["start"]) + 0.08, float(w["end"]) - shift), 3)
+
+        # If Whisper still returns obviously unusable timing or too few words, prefer an
+        # even timing fallback over late/missing subtitles. This is only a safety net.
+        ref_wc = len([x for x in str(reference_text or "").split() if x.strip()])
+        if ref_wc and len(words) < max(12, int(ref_wc * 0.45)):
+            logger.warning(
+                "Whisper returned too few words (%s of reference %s). Using even fallback timings for complete caption coverage.",
+                len(words), ref_wc,
+            )
+            words = _fallback_even_timings(reference_text, duration)
+
     # Captions must be speech-aware: no stale first caption during leading silence, and
     # no final caption held after narration ends.
     if duration is not None and words:

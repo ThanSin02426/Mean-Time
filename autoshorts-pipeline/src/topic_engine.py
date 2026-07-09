@@ -170,11 +170,33 @@ def categorize_topic(topic: str) -> str:
     return "mystery"
 
 
+def _default_seed_queue(min_count: int = 30) -> List[str]:
+    """Demand-oriented seed queue used if topics.txt is missing/empty."""
+    order = ["space", "ocean", "animals", "history", "mystery", "science", "places", "psychology"]
+    topics: List[str] = []
+    idx = 0
+    while len(topics) < min_count:
+        niche = order[idx % len(order)]
+        templates = TOPIC_TEMPLATES.get(niche, [])
+        if templates:
+            topics.append(templates[(idx // len(order)) % len(templates)])
+        idx += 1
+    return topics
+
+
 def read_topics(topics_file: str) -> List[str]:
     if not os.path.exists(topics_file):
-        raise FileNotFoundError(f"Topics file not found: {topics_file}")
+        logger.warning(f"Topics file not found: {topics_file}. Creating a fresh demand-oriented queue.")
+        seed = _default_seed_queue()
+        write_topics(topics_file, seed)
+        return seed
     topics = [clean_topic_line(line) for line in Path(topics_file).read_text(encoding="utf-8").splitlines()]
-    return [t for t in topics if t]
+    topics = [t for t in topics if t]
+    if not topics:
+        logger.warning(f"Topics file is empty: {topics_file}. Refilling it with demand-oriented seed topics.")
+        topics = _default_seed_queue()
+        write_topics(topics_file, topics)
+    return topics
 
 
 def write_topics(topics_file: str, topics: List[str]) -> None:
@@ -244,21 +266,30 @@ def _recent_niches() -> List[str]:
     return list(state.get("recent_niches", []))[-NICHE_REPEAT_DISTANCE:]
 
 
-def _select_niche(selected_topic: str) -> Tuple[str, str]:
+def _select_niche(selected_topic: str, current_topics: Optional[List[str]] = None) -> Tuple[str, str]:
     scores = update_niche_scores_from_history()
     recent = _recent_niches()
+    # Avoid immediately appending the same niche as the topic just used.
+    selected_niche = categorize_topic(selected_topic)
+    protected_recent = list(dict.fromkeys((recent + [selected_niche])[-NICHE_REPEAT_DISTANCE:]))
+    current_topics = current_topics or []
+    current_niches = [categorize_topic(t) for t in current_topics[:max(3, NICHE_REPEAT_DISTANCE // 2)]]
     exploration = random.random() < EXPLORATION_RATE
     if exploration:
-        candidates = [n for n in TOPIC_TEMPLATES if n not in recent] or list(TOPIC_TEMPLATES)
+        candidates = [n for n in TOPIC_TEMPLATES if n not in protected_recent and n not in current_niches] or [n for n in TOPIC_TEMPLATES if n not in protected_recent] or list(TOPIC_TEMPLATES)
         return random.choice(candidates), "exploration"
 
     ranked = sorted(scores.values(), key=lambda x: x.get("score", 0), reverse=True)
     for row in ranked:
         niche = row["niche"]
-        if niche not in recent:
+        if niche not in protected_recent and niche not in current_niches:
             return niche, "analytics_exploitation"
+    for row in ranked:
+        niche = row["niche"]
+        if niche not in protected_recent:
+            return niche, "analytics_exploitation_relaxed"
     # If every niche appears in the recent window, use the selected topic's niche as a safe fallback.
-    return categorize_topic(selected_topic), "repeat_distance_fallback"
+    return random.choice([n for n in TOPIC_TEMPLATES if n != selected_niche] or list(TOPIC_TEMPLATES)), "repeat_distance_fallback"
 
 
 def _pick_topic_from_niche(niche: str, existing_topics: List[str], selected_topic: str) -> str:
@@ -326,7 +357,7 @@ def _update_topic_state(selected: str, replacement: str, replacement_niche: str,
 def pop_topic_and_refresh_queue(topics_file: str) -> str:
     # Best-effort analytics sync. It never blocks video generation.
     try:
-        if os.environ.get("ENABLE_ANALYTICS_SYNC", "true").lower() in {"1", "true", "yes"}:
+        if os.environ.get("ENABLE_ANALYTICS_SYNC", "false").lower() in {"1", "true", "yes"}:
             sync_analytics_if_possible()
     except Exception as exc:
         logger.warning(f"Analytics sync skipped: {exc}")
@@ -336,7 +367,7 @@ def pop_topic_and_refresh_queue(topics_file: str) -> str:
         raise RuntimeError(f"No topics found in {topics_file}")
 
     selected = topics.pop(0)
-    replacement_niche, mode = _select_niche(selected)
+    replacement_niche, mode = _select_niche(selected, topics)
     replacement = _pick_topic_from_niche(replacement_niche, topics, selected)
     topics.append(replacement)
     write_topics(topics_file, topics)
@@ -347,6 +378,7 @@ def pop_topic_and_refresh_queue(topics_file: str) -> str:
 
     logger.info(f"Popped topic from queue: '{selected}'")
     logger.info(f"Appended replacement topic: '{replacement}' [{replacement_niche}, {mode}]")
+    logger.info(f"Topic queue now has {len(topics)} topics. Next queued topic: '{topics[0] if topics else '<empty>'}'")
     return selected
 
 
