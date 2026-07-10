@@ -1,128 +1,130 @@
 # AutoShorts Pipeline
 
-## 1. Project Overview
+A GitHub Actions pipeline that generates vertical YouTube Shorts from a topic, creates narration, transcribes the final narration with faster-whisper for synchronized captions, sources stock visuals, assembles the video, and optionally uploads it to YouTube.
 
-AutoShorts Pipeline is a completely free, automated Python pipeline that generates and publishes YouTube Shorts end-to-end. It requires no paid credits or subscriptions. It uses:
-- Gemini for script generation (with a fallback to Pollinations.ai)
-- edge-tts for voiceover and synchronized captions
-- Pexels/Pixabay APIs and NASA imagery for stock media visuals (with beautifully designed local slide fallbacks)
-- MoviePy & ffmpeg for video assembly (Ken Burns effects, crossfades, ducked background music, and animated captions)
-- YouTube Data API v3 for optional automated uploads
-- GitHub Actions for free cloud execution on a daily schedule
+## Workflow behavior
 
-## 2. Repository Structure
+The manual workflow has only two inputs:
 
-- The main application code and Python scripts are located inside the `autoshorts-pipeline/` directory.
-- The GitHub Actions workflow file is located at the repository root: `.github/workflows/daily.yml`.
-- The workflow natively uses `working-directory: autoshorts-pipeline` to ensure scripts run in the correct context.
-- Assets (such as background music) should be placed inside `autoshorts-pipeline/assets/music/`.
+- `topic`: optional. Leave blank to use the first line of `topics.txt`.
+- `publish`: `false` creates a downloadable artifact; `true` uploads to YouTube.
 
-## 3. Required GitHub Secrets
+Scheduled runs use `topics.txt` and publish automatically at:
 
-To run this pipeline via GitHub Actions, you must configure the following Repository Secrets:
-- `GEMINI_API_KEY`
-- `YOUTUBE_CLIENT_ID`
-- `YOUTUBE_CLIENT_SECRET`
-- `YOUTUBE_REFRESH_TOKEN`
-- `PEXELS_API_KEY`
-- `PIXABAY_API_KEY` (optional fallback)
+- 09:00 AM IST
+- 07:30 PM IST
 
-## 4. Gemini API Setup
+When queue mode is used, the first topic is removed and a replacement topic is appended to keep the queue running.
 
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Sign in with your Google account.
-3. Click "Create API key" and copy the generated key.
-4. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions.
-5. Create a new secret named `GEMINI_API_KEY` and paste your key.
+## Required GitHub secrets
 
-By default, the script auto-detects the best Gemini Flash model available. If you want to force a specific model, add a GitHub secret (or `.env` variable) named `GEMINI_MODEL` (e.g., `gemini-2.5-flash`).
+Add these under **Repository → Settings → Secrets and variables → Actions → Secrets**:
 
-## 5. YouTube API Setup
+```text
+GEMINI_API_KEY
+YOUTUBE_CLIENT_ID
+YOUTUBE_CLIENT_SECRET
+YOUTUBE_REFRESH_TOKEN
+PEXELS_API_KEY
+```
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new Project (e.g., "AutoShorts").
-3. Go to **APIs & Services > Library** and search for "YouTube Data API v3". Enable it.
-4. Go to **APIs & Services > OAuth consent screen**.
-   - Choose "External" (or Internal if you have a Workspace account).
-   - Fill in the required app info (App name, support email, developer email).
-   - Add the following scope: `https://www.googleapis.com/auth/youtube.upload`
-   - **Important:** Add the Gmail account that owns your YouTube channel as a "Test User" while the app is in Testing mode.
+Optional:
 
-## 6. Correct OAuth Client Setup
+```text
+PIXABAY_API_KEY
+GEMINI_MODEL
+WHISPER_MODEL
+```
 
-1. Go to **APIs & Services > Credentials**.
-2. Click **Create Credentials > OAuth client ID**.
-3. **Application type MUST be "Web application"** (do NOT select Desktop app).
-4. Name it (e.g., "AutoShorts Web Client").
-5. Under **Authorized redirect URIs**, click Add URI and paste EXACTLY:
-   `https://developers.google.com/oauthplayground`
-6. Click Create.
-7. Copy the **Client ID** and **Client Secret**.
-8. Save them as GitHub secrets: `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET`.
+API keys and OAuth tokens should be stored as **Secrets**, not public repository variables.
 
-## 7. Getting the YouTube Refresh Token
+## Visual and subtitle pipeline
 
-Because this script runs headlessly via GitHub Actions, it needs a refresh token to generate short-lived access tokens for uploads.
-1. Open the [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground/).
-2. Click the gear icon (OAuth 2.0 configuration) in the top right.
-3. Check the box for "Use your own OAuth credentials".
-4. Paste your Web application **Client ID** and **Client Secret**.
-5. Close the gear menu. In **Step 1**, paste this scope into the "Input your own scopes" field:
-   `https://www.googleapis.com/auth/youtube.upload`
-6. Click **Authorize APIs**.
-7. Sign in using the Gmail account that owns your YouTube channel (the one you added as a Test User).
-8. If you see an "unverified app" warning, click Advanced and continue (since this is your personal testing app).
-9. In **Step 2**, click **Exchange authorization code for tokens**.
-10. Copy the **Refresh token**.
-11. Save it as a GitHub secret: `YOUTUBE_REFRESH_TOKEN`.
+The pipeline uses this visual order automatically:
 
-## 8. Workflow Configuration & Automatic Schedules
+1. Pexels
+2. Pixabay fallback
+3. NASA media for relevant space topics
+4. Local designed fallback slides
 
-The GitHub Actions workflow operates automatically twice a day based on standard cron schedules:
-- **09:00 AM IST**
-- **07:30 PM IST**
+Subtitle architecture:
 
-Scheduled runs will automatically pull a topic from `topics.txt` and publish directly to YouTube.
+```text
+TTS narration
+→ trim leading/trailing silence
+→ transcribe that exact final narration with faster-whisper
+→ create phrase captions from word timestamps
+→ burn captions into the MP4
+```
 
-You can also manually trigger a run (via **Run workflow**), where you have two simple options:
-- **Topic**: Leave blank to pop a topic from your `topics.txt` queue, or type a specific topic.
-- **Publish**: Check this (`true`) to upload the video to YouTube. Leave it unchecked (`false`) to generate the video and upload it as a downloadable artifact for review instead.
+The same final narration file is used for Whisper and for the finished video.
 
-## 9. Recommended Visual Media Strategy
+## YouTube OAuth setup
 
-The pipeline automatically handles sourcing high-quality vertical visuals for your Shorts using a prioritized cascade:
-1. **Pexels Video/Photo API** (Primary source)
-2. **Pixabay Video/Photo API** (Secondary fallback)
-3. **NASA Media Library** (Triggered exclusively for space/science topics)
-4. **Local Designed Fallback** (If all networks fail, generates beautiful, cinematic text-based slides)
+1. Enable **YouTube Data API v3** in Google Cloud.
+2. Configure an External OAuth consent screen.
+3. Create an OAuth client of type **Web application**.
+4. Add this redirect URI exactly:
 
-*Pollinations AI image generation is no longer used by default due to high unreliability and rate limiting.*
+```text
+https://developers.google.com/oauthplayground
+```
 
-## 10. How to Preview and Publish
+5. Open Google OAuth 2.0 Playground.
+6. Enable **Use your own OAuth credentials** and enter the same client ID and client secret.
+7. Authorize this scope:
 
-Always test your setup using **Preview Mode** first! We recommend starting with a fast test:
-1. Go to Actions > Daily YouTube Shorts Auto-Publisher.
-2. Click **Run workflow**.
-3. Fill out the fields with these recommended settings:
-   - **Topic**: `3 terrifying space facts that sound fake`
-   - **Publish**: `false` (unchecked)
-4. Click **Run workflow** and wait for it to complete.
-5. Open the run details and scroll down to the **Artifacts** section at the bottom of the Summary page.
-6. Download the `generated-short` artifact to view your MP4 video and its metadata JSON.
-7. If everything looks good, you can re-run with **Publish** checked. The pipeline has a built-in Quality Gate that explicitly blocks publishing if the video exceeds 58 seconds.
+```text
+https://www.googleapis.com/auth/youtube.upload
+```
 
-## 11. Music
+8. Exchange the authorization code for tokens.
+9. Save the new refresh token as `YOUTUBE_REFRESH_TOKEN` in GitHub Actions secrets.
 
-Do **NOT** attempt to use trending copyrighted YouTube Shorts songs automatically via scripts. It will cause copyright strikes.
-- The safest method is to manually download copyright-safe tracks from the [YouTube Audio Library](https://studio.youtube.com/channel/UC/music).
-- Place these files in `autoshorts-pipeline/assets/music/`.
-- If local music is found, the pipeline mixes it ducked under the voiceover.
-- If no local music exists, it will search the Pixabay Audio API for a cinematic track.
-- If all fails, it renders narration-only without crashing.
+## Critical: prevent refresh-token expiry
 
-## 12. Local Testing
+If the OAuth consent screen remains in **Testing**, Google refresh tokens for an external app can expire after seven days. The workflow then fails with:
 
-To run and test the pipeline on your own machine:
+```text
+invalid_grant: Token has been expired or revoked
+```
+
+For reliable twice-daily automation:
+
+1. Go to **Google Cloud Console → Google Auth Platform / OAuth consent screen → Audience**.
+2. Change the publishing status from **Testing** to **In production**.
+3. Generate a **new** refresh token in OAuth Playground after changing the status.
+4. Replace the GitHub secret `YOUTUBE_REFRESH_TOKEN` with the new token.
+
+Changing the status does not revive the old token. You must generate and save a new token.
+
+A personal app may still display an unverified-app warning during consent. Continue only for the Google account that owns your channel. Do not share OAuth credentials or refresh tokens.
+
+## OAuth preflight
+
+Publish runs validate the refresh token **before** generating the video. This prevents an expired token from wasting 8–10 minutes of rendering time.
+
+You can verify credentials locally or in a configured environment with:
+
+```bash
+cd autoshorts-pipeline
+python -m src.uploader --check-auth
+```
+
+If upload fails after rendering for another reason, GitHub Actions uploads a recovery artifact containing the MP4 and metadata.
+
+## First safe test
+
+Run the workflow manually with:
+
+```text
+topic: 3 terrifying space facts that sound fake
+publish: false
+```
+
+Open the completed run and download the `generated-short-<run number>` artifact. Check the video before using `publish=true`.
+
+## Local run
 
 ```bash
 cd autoshorts-pipeline
@@ -130,137 +132,52 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-
-# Fill out the .env file with your API keys and credentials
-# WARNING: NEVER commit your .env file to version control!
-
-python src/main.py --topic "3 strange facts about the ocean" --no-upload
+python src/main.py --topic "3 terrifying space facts that sound fake" --no-upload
 ```
 
-## 13. Troubleshooting
+Never commit `.env`.
 
-- **Write access to repository not granted?** If the workflow completes the video but fails at the final "Commit queue updates" step with a 403 error, go to your GitHub repository **Settings -> Actions -> General -> Workflow permissions** and select **Read and write permissions**.
-- **Gemini model not found error?** The script tries to auto-detect a working model, but if it fails, set `GEMINI_MODEL` as an environment variable/GitHub Secret to a currently supported model (e.g. `gemini-2.5-flash`).
-- **Workflow doesn't show in Actions?** Ensure that `.github/workflows/daily.yml` is at the absolute root of your repository, NOT inside `autoshorts-pipeline/`.
-- **Run workflow button is missing?** Ensure the `workflow_dispatch` trigger is properly defined in the `daily.yml` file.
-- **OAuth says access blocked?** Ensure you added your email address as a "Test User" on the OAuth consent screen in Google Cloud Console.
-- **OAuth Playground redirect fails?** Ensure you created the OAuth client as a **Web application** (not a Desktop app) and typed the redirect URI perfectly.
-- **Video artifact is missing?** Ensure `publish` was false and that the `upload-artifact` step executed successfully without path errors.
+## Background music
 
-
-## Important fixes in this build
-
-- The workflow UI has only two inputs: `topic` and `publish`.
-- `publish=false` creates a downloadable artifact. `publish=true` uploads to YouTube.
-- Scheduled runs publish automatically twice daily: 09:00 AM IST and 07:30 PM IST.
-- Subtitles are generated by transcribing the final TTS audio with `faster-whisper`, so caption timing is based on the actual audio viewers hear.
-- The queue file is `topics.txt`: each scheduled queue run pops the first topic, appends a similar replacement topic at the end, and commits the update.
-- Visuals use Pexels first, Pixabay fallback, NASA for space topics, and local designed slides as the final fallback.
-
-If a run fails during startup with an import error, confirm `requirements.txt` was installed and that no unused packages such as `webvtt` are imported.
-
-## Important: Subtitle Sync Architecture
-
-The pipeline now uses a speech-aware subtitle pipeline inspired by MoneyPrinter-style systems:
-
-1. Generate the TTS narration audio.
-2. Trim leading/trailing silence with ffmpeg.
-3. Save the final narration file at `output/narration_final.mp3`.
-4. Transcribe that exact final audio with `faster-whisper` and `word_timestamps=True`.
-5. Burn captions from `output/captions.json`.
-
-This is important: captions are not forced to start at `0.0s`. The first caption starts at the first spoken word timestamp, so a caption will not sit on screen before the voice begins. Small pauses under about 0.35s are bridged, but long silent gaps are allowed to have no caption.
-
-Useful tuning variables:
-
-```env
-CAPTION_LEAD_SECONDS=0.0
-SILENCE_THRESHOLD_DB=-50dB
-SILENCE_START_DURATION=0.12
-SILENCE_STOP_DURATION=0.18
-```
-
-Keep `CAPTION_LEAD_SECONDS=0.0` unless captions feel consistently late.
-
-## Analytics-Driven Never-Ending Topic Queue
-
-The workflow still uses `topics.txt` as the active queue. When the queue is used:
-
-1. The first topic is selected.
-2. That topic is removed from the top.
-3. A replacement topic is generated and appended to the bottom.
-4. The same niche is avoided for about 10 queue iterations when possible.
-5. The system uses an 80/20 strategy:
-   - 80%: exploit niches that perform well.
-   - 20%: explore new/out-of-the-box niches.
-
-The topic engine writes these files:
+Place copyright-safe `.mp3` or `.wav` files in:
 
 ```text
-topic_bank.json
-analytics_history.json
-niche_scores.json
-topic_state.json
-upload_history.json
+autoshorts-pipeline/assets/music/
 ```
 
-Videos younger than 48 hours are ignored for scoring so the system gives each Short time to perform. The preferred evaluation age is 72 hours.
+Use tracks from sources whose licenses permit your use, such as the YouTube Audio Library. The pipeline continues with narration only when no safe music is present.
 
-Environment variables:
+## Troubleshooting
 
-```env
-ENABLE_ANALYTICS_SYNC=true
-MIN_ANALYTICS_AGE_HOURS=48
-PREFERRED_ANALYTICS_AGE_HOURS=72
-NICHE_REPEAT_DISTANCE=10
-EXPLORATION_RATE=0.20
+### `invalid_grant: Token has been expired or revoked`
+
+The refresh token is invalid. This is not a transient upload problem and retries cannot fix it.
+
+- Set the OAuth app to **In production**.
+- Generate a new refresh token.
+- Replace `YOUTUBE_REFRESH_TOKEN` in GitHub secrets.
+- Re-run the workflow.
+
+### Manual `publish=false` has no artifact
+
+The run uploads an artifact only when a rendered MP4 exists. Open **Final debug summary** and confirm `final_short_exists=true`.
+
+### Topic queue does not commit
+
+Go to:
+
+```text
+Repository → Settings → Actions → General → Workflow permissions
 ```
 
-Analytics sync is best-effort. If YouTube stats cannot be fetched, video generation still continues and the queue uses local fallback scoring.
+Select **Read and write permissions**.
 
-Manual analytics sync:
+### Captions are early or late
 
-```bash
-cd autoshorts-pipeline
-python src/main.py --sync-analytics
-```
+Keep:
 
-## Workflow Inputs
-
-Manual workflow runs should stay simple:
-
-- `topic`: optional. If empty, the workflow uses `topics.txt`.
-- `publish`: `false` gives a downloadable artifact; `true` uploads to YouTube.
-
-Scheduled runs use `topics.txt` and publish automatically.
-
-
-## Final stability notes
-
-The workflow UI intentionally has only two inputs: `topic` and `publish`.
-
-- `publish=false` renders the MP4 and uploads a `generated-short` artifact.
-- `publish=true` renders the MP4 and uploads to YouTube only after duration/caption quality gates pass.
-- Leaving `topic` empty uses `topics.txt`: the first topic is removed and a new demand-style replacement is appended at the bottom.
-- Analytics optimization is disabled by default for now with `ENABLE_ANALYTICS_SYNC=false`; the queue still rotates niches and avoids repeating the same niche too quickly.
-
-Subtitle pipeline:
-
-1. Generate TTS.
-2. Trim leading/trailing silence.
-3. Transcribe the exact final narration audio with faster-whisper.
-4. Normalize small Whisper start delays so captions appear with the first spoken phrase.
-5. Burn smaller bottom-third captions into the final MP4.
-
-If captions feel early/late, tune these variables in GitHub Actions variables or `.env`:
-
-```env
+```text
 CAPTION_LEAD_SECONDS=0.0
-NORMALIZE_CAPTION_START=true
-MAX_CAPTION_START_SHIFT_SECONDS=1.25
-CAPTION_FONT_SIZE=60
-CAPTION_SMALL_FONT_SIZE=52
-CAPTION_Y=1410
 ```
 
-Do not enable `publish=true` until a `publish=false` artifact has been checked.
+The pipeline already trims silence and transcribes the final narration. Review `output/captions.json` and the caption timing report in the artifact before changing timing values.

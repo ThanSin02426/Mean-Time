@@ -16,7 +16,7 @@ from src.script_gen import generate_script, get_local_fallback
 from src.voiceover import generate_audio
 from src.subtitles import transcribe_audio_with_whisper
 from src.video_assembly import assemble_video
-from src.uploader import upload_video
+from src.uploader import upload_video, YouTubeAuthenticationError
 from src.audio_utils import trim_silence_for_caption_sync, audio_duration_seconds
 from src import topic_engine
 
@@ -102,6 +102,7 @@ def process_topic(topic: str, upload: bool = True):
         "topic": topic,
         "upload_attempted": False,
         "youtube_url": None,
+        "upload_status": "not_started",
         "quality_gate_passed": False,
     }
 
@@ -237,8 +238,29 @@ def process_topic(topic: str, upload: bool = True):
             raise RuntimeError(f"Quality Gate Failed: {error_msg}")
 
         if upload:
-            video_url = upload_video(output_video_path, title, description, tags)
+            metadata["upload_attempted"] = True
+            metadata["upload_status"] = "attempting"
+            _write_metadata("output/metadata.json", metadata)
+            try:
+                video_url = upload_video(output_video_path, title, description, tags)
+            except YouTubeAuthenticationError as exc:
+                metadata["upload_status"] = "authentication_failed"
+                metadata["upload_error"] = str(exc)
+                metadata["recovery_artifact_available"] = os.path.exists(output_video_path)
+                _write_metadata("output/metadata.json", metadata)
+                logger.error(
+                    "YouTube authentication failed. The rendered MP4 is preserved for the recovery artifact: %s",
+                    output_video_path,
+                )
+                raise
+            except Exception as exc:
+                metadata["upload_status"] = "failed"
+                metadata["upload_error"] = str(exc)
+                metadata["recovery_artifact_available"] = os.path.exists(output_video_path)
+                _write_metadata("output/metadata.json", metadata)
+                raise
             metadata["youtube_url"] = video_url
+            metadata["upload_status"] = "uploaded"
             _write_metadata("output/metadata.json", metadata)
             try:
                 topic_engine.record_uploaded_video(video_url, title, topic)
@@ -253,6 +275,8 @@ def process_topic(topic: str, upload: bool = True):
                 logger.warning("Thumbnail upload skipped/failed: %s", exc)
             logger.info("=== Pipeline Completed Successfully! URL: %s ===", video_url)
         else:
+            metadata["upload_status"] = "skipped"
+            _write_metadata("output/metadata.json", metadata)
             logger.info("=== Pipeline Completed Successfully! Video saved to %s (Upload skipped) ===", output_video_path)
     except Exception as e:
         metadata["pipeline_error"] = str(e)

@@ -25,6 +25,7 @@ permissions:
 jobs:
   generate_and_upload:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: autoshorts-pipeline
@@ -33,10 +34,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
           cache: 'pip'
 
       - name: Cache Whisper model
@@ -45,7 +46,7 @@ jobs:
           path: |
             ~/.cache/huggingface
             ~/.cache/torch
-          key: whisper-cache-v2-${{ runner.os }}
+          key: whisper-cache-v3-${{ runner.os }}-py311
 
       - name: Install system dependencies
         run: |
@@ -56,6 +57,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      # Do this BEFORE an 8-10 minute render. invalid_grant is permanent until
+      # YOUTUBE_REFRESH_TOKEN is replaced, so rendering first only wastes time.
+      - name: Preflight YouTube OAuth (publish runs only)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          PYTHONPATH: .
+        run: python -m src.uploader --check-auth
 
       - name: Run AutoShorts Pipeline
         env:
@@ -70,11 +82,6 @@ jobs:
           WHISPER_DEVICE: cpu
           WHISPER_COMPUTE_TYPE: int8
           CAPTION_LEAD_SECONDS: '0.0'
-          NORMALIZE_CAPTION_START: 'true'
-          MAX_CAPTION_START_SHIFT_SECONDS: '1.25'
-          CAPTION_FONT_SIZE: '60'
-          CAPTION_SMALL_FONT_SIZE: '52'
-          CAPTION_Y: '1410'
           ENABLE_ANALYTICS_SYNC: 'false'
           MIN_NARRATION_WORDS: '95'
           TARGET_NARRATION_WORDS: '108'
@@ -95,29 +102,29 @@ jobs:
             ARGS+=(--topics-file "topics.txt")
           fi
 
-          # Scheduled runs publish automatically. Manual runs publish only when publish=true.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${WORKFLOW_PUBLISH}" != "true" ]; then
-            echo "manual publish=false: artifact-only mode"
+          # Scheduled runs publish. Manual runs upload only when publish=true.
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${WORKFLOW_PUBLISH}" != "true" ]; then
             ARGS+=(--no-upload)
-          else
-            echo "publish mode enabled"
           fi
 
-          echo "event_name=${{ github.event_name }}"
+          echo "event_name=${GITHUB_EVENT_NAME}"
           echo "topic_input=${WORKFLOW_TOPIC:-<queue>}"
           echo "publish_input=${WORKFLOW_PUBLISH}"
-          echo "command=python src/main.py ${ARGS[*]}"
+          printf 'command=python src/main.py'
+          printf ' %q' "${ARGS[@]}"
+          printf '\n'
           python src/main.py "${ARGS[@]}"
 
       - name: Final debug summary
         if: always()
         run: |
-          echo "event_name=${{ github.event_name }}"
+          echo "event_name=${GITHUB_EVENT_NAME}"
           echo "topic_input=${{ inputs.topic || '' }}"
           echo "publish_input=${{ inputs.publish || false }}"
           if [ -f output/final_short.mp4 ]; then
             echo "final_short_exists=true"
             ls -lh output/final_short.mp4
+            echo -n "final_duration_seconds="
             ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 output/final_short.mp4 || true
           else
             echo "final_short_exists=false"
@@ -127,23 +134,27 @@ jobs:
             cat output/metadata.json
           fi
 
-      - name: Upload Artifacts (manual publish=false only)
-        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.publish == false || inputs.publish == 'false' || inputs.publish == '') }}
+      # Manual publish=false always gets a review artifact. A publish failure after
+      # rendering also gets a recovery artifact so the completed MP4 is not lost.
+      - name: Upload review or recovery artifact
+        if: ${{ always() && (failure() || (github.event_name == 'workflow_dispatch' && !inputs.publish)) }}
         uses: actions/upload-artifact@v4
         with:
-          name: generated-short
+          name: generated-short-${{ github.run_number }}
           path: |
             autoshorts-pipeline/output/final_short.mp4
+            autoshorts-pipeline/output/narration_final.mp3
             autoshorts-pipeline/output/metadata.json
             autoshorts-pipeline/output/audio_timing_report.json
             autoshorts-pipeline/output/caption_timing_report.json
             autoshorts-pipeline/output/debug_contact_sheet.jpg
             autoshorts-pipeline/output/captions.json
             autoshorts-pipeline/output/caption_sample_*.png
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Commit queue updates
-        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.topic == '' || inputs.topic == null)) }}
+        if: ${{ success() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.topic == '' || inputs.topic == null))) }}
         continue-on-error: true
         run: |
           git config --local user.email "action@github.com"

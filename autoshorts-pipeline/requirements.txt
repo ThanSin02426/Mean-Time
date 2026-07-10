@@ -4,6 +4,7 @@ requests==2.32.3
 moviepy==1.0.3
 faster-whisper>=1.0.0,<2.0.0
 google-api-python-client==2.137.0
+httplib2>=0.22.0,<1.0.0
 google-auth-oauthlib==1.2.0
 pillow>=10,<12
 urllib3<2.0
