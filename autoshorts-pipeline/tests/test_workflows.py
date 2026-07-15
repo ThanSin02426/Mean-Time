@@ -35,8 +35,11 @@ def test_workflows_use_node24_action_generations():
     assert "actions/setup-python@v5" not in combined
     assert "actions/cache@v4" not in combined
     assert "actions/upload-artifact@v4" not in combined
+    assert "actions/upload-artifact@v5" not in combined
+    assert "actions/upload-artifact@v6" not in combined
     assert "actions/checkout@v5" in combined
     assert "actions/setup-python@v6" in combined
+    assert "actions/upload-artifact@v7" in combined
 
 
 def test_publisher_summary_includes_subtitle_diagnostics():

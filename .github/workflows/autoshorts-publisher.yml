@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload review or recovery artifact
         if: always() && (steps.mode.outputs.publish != 'true' || failure() || steps.queue_push.outputs.status == 'failed')
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: autoshorts-${{ github.run_number }}-${{ github.run_attempt }}
           if-no-files-found: error

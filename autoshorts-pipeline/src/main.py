@@ -16,7 +16,7 @@ from .config import Settings
 from .fact_check import build_fact_check
 from .models import RunManifest, utc_now
 from .quality_gates import required_gates_pass, run_quality_gates
-from .script_gen import generate_script
+from .script_gen import generate_script, repair_script_sources
 from .subtitles import render_subtitle_test, transcribe_and_align
 from .topic_engine import QueueManager, QueueReservation
 from .uploader import check_auth, upload_video
@@ -79,8 +79,43 @@ def run_pipeline(topic: str | None, publish: bool, settings: Settings, network_f
         manifest.save(manifest_path)
 
         fact_report = build_fact_check(script, settings.output_dir / "fact_check.json", network_verify=network_fact_check)
+        repair_attempts = max(0, int(os.getenv("FACT_SOURCE_REPAIR_ATTEMPTS", "2")))
+        for attempt in range(repair_attempts):
+            if fact_report["passed"] or script.get("generation_mode") != "gemini":
+                break
+            failed_scenes = [row.get("scene") for row in fact_report.get("claims", []) if not row.get("passed")]
+            logger.warning(
+                "Fact-check failed for scenes %s; attempting grounded source repair %d/%d",
+                failed_scenes,
+                attempt + 1,
+                repair_attempts,
+            )
+            try:
+                script = repair_script_sources(script, fact_report)
+            except Exception as repair_exc:
+                logger.warning("Automatic source repair attempt %d failed: %s", attempt + 1, repair_exc)
+                continue
+            manifest.script = script
+            manifest.scene_list = script["scenes"]
+            manifest.save(manifest_path)
+            fact_report = build_fact_check(
+                script,
+                settings.output_dir / "fact_check.json",
+                network_verify=network_fact_check,
+            )
         if not fact_report["passed"]:
-            raise RuntimeError("Fact-check gate failed: at least one scene lacks a reachable authoritative source")
+            failed_details = []
+            for row in fact_report.get("claims", []):
+                if row.get("passed"):
+                    continue
+                statuses = ", ".join(
+                    f"{source.get('url')} ({source.get('detail')})"
+                    for source in row.get("sources", [])
+                ) or "no source URLs"
+                failed_details.append(f"scene {row.get('scene')}: {statuses}")
+            raise RuntimeError(
+                "Fact-check gate failed after source repair: " + "; ".join(failed_details)
+            )
 
         raw_audio = settings.work_dir / "narration_raw.mp3"
         canonical_audio = settings.output_dir / "narration_final.wav"

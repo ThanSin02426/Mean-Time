@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+from copy import deepcopy
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -116,6 +117,94 @@ def validate_script(data: dict[str, Any], topic: str, history_path: str | Path) 
         data["description"] = (data["description"] + " #Shorts").strip()
     return data
 
+
+
+def apply_source_repairs(
+    script_data: dict[str, Any],
+    repair_payload: dict[str, Any],
+    failed_scene_numbers: set[int],
+) -> dict[str, Any]:
+    """Apply source-only repairs without changing narration, claims, or scene order."""
+    repaired = deepcopy(script_data)
+    scenes = repaired.get("scenes", [])
+    applied = 0
+    for row in repair_payload.get("repairs", []):
+        try:
+            scene_number = int(row.get("scene"))
+        except (TypeError, ValueError):
+            continue
+        if scene_number not in failed_scene_numbers or not 1 <= scene_number <= len(scenes):
+            continue
+        sources = row.get("sources") or []
+        if isinstance(sources, str):
+            sources = [sources]
+        cleaned: list[str] = []
+        for source in sources:
+            value = str(source).strip()
+            if value.startswith(("https://", "http://")) and value not in cleaned:
+                cleaned.append(value)
+        if not cleaned:
+            continue
+        scene = scenes[scene_number - 1]
+        scene["sources"] = cleaned
+        note = str(row.get("source_note", "")).strip()
+        if note:
+            scene["source_note"] = note
+        applied += 1
+    if applied == 0:
+        raise ValueError("Source repair response did not contain usable replacements for failed scenes")
+    return repaired
+
+
+def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, Any]) -> dict[str, Any]:
+    """Use grounded Google Search once to replace only dead/non-authoritative URLs."""
+    failed_rows = [row for row in fact_report.get("claims", []) if not row.get("passed")]
+    failed_scene_numbers = {int(row["scene"]) for row in failed_rows if row.get("scene")}
+    if not failed_scene_numbers:
+        return script_data
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is required for automatic source repair")
+
+    from google import genai
+    from google.genai import types
+
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    client = genai.Client(api_key=api_key)
+    failed_context = []
+    for row in failed_rows:
+        scene_number = int(row["scene"])
+        scene = script_data["scenes"][scene_number - 1]
+        failed_context.append({
+            "scene": scene_number,
+            "claim": scene.get("claim", ""),
+            "source_note": scene.get("source_note", ""),
+            "failed_sources": row.get("sources", []),
+        })
+
+    prompt = f"""
+Search the live web and repair ONLY the source URLs for the failed factual scenes below.
+Do not rewrite narration, claims, title, topic, or scene order.
+For each failed scene, return 2 or 3 direct, currently reachable URLs from authoritative primary or institutional sources that support the exact claim.
+Prefer NASA, NOAA, USGS, NIH, WHO, universities, peer-reviewed journals, museums, national academies, ESA, or CERN.
+Do not guess URLs. Do not use dead legacy paths, guessed /wp-content/uploads paths, search-result pages, or generic homepages when a claim-specific page exists.
+Return JSON only in this exact schema:
+{{"repairs":[{{"scene":1,"source_note":"why these sources support the claim","sources":["https://...","https://..."]}}]}}
+
+Topic: {script_data.get('topic', '')}
+Failed scenes: {json.dumps(failed_context, ensure_ascii=False)}
+"""
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.1,
+        ),
+    )
+    payload = _extract_json(response.text or "")
+    return apply_source_repairs(script_data, payload, failed_scene_numbers)
 
 def _local_fallback(topic: str) -> dict[str, Any]:
     niche = QueueManager.categorize(topic)
