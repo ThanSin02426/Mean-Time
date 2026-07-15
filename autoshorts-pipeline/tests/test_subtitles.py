@@ -95,3 +95,15 @@ def test_every_spoken_word_overlaps_a_caption_after_temporal_grouping():
     chunks = create_caption_chunks(words, 3.2)
     assert _max_active_speech_caption_gap(words, chunks) <= 0.001
     assert all(chunk.end - chunk.start <= 1.8 + 0.001 for chunk in chunks)
+
+
+def test_tiny_gap_bridge_never_creates_stale_caption_tail():
+    words = [
+        WordTiming("The", "the", 0.00, 0.14, "whisper", True),
+        WordTiming("Earth.", "earth", 0.15, 0.35, "whisper", True),
+        WordTiming("Then", "then", 0.58, 0.76, "whisper", True),
+        WordTiming("moves", "moves", 0.77, 1.02, "whisper", True),
+    ]
+    chunks = create_caption_chunks(words, 1.3)
+    assert chunks[0].end - words[1].end <= 0.20 + 0.001
+    assert _max_active_speech_caption_gap(words, chunks) <= 0.001

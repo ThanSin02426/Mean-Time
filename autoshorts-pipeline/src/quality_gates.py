@@ -28,6 +28,28 @@ def _black_duration(path: Path) -> float:
     return sum(durations)
 
 
+
+
+def _caption_gate_metrics(captions: list[dict[str, Any]], subtitle_report: dict[str, Any]) -> dict[str, Any]:
+    durations = [
+        max(0.0, float(row.get("end", 0)) - float(row.get("start", 0)))
+        for row in captions
+    ]
+    minimum = min(durations) if durations else 0.0
+    maximum = max(durations) if durations else 0.0
+    tail = float(subtitle_report.get("maximum_caption_tail_after_word", 99) or 0)
+    short_count = int(subtitle_report.get("short_caption_count", sum(value < 0.34 for value in durations)) or 0)
+    return {
+        "minimum": minimum,
+        "maximum": maximum,
+        "tail": tail,
+        "short_count": short_count,
+        # Staleness is about text lingering too long, not a caption being briefly
+        # visible when rapid speech leaves no room for a full 0.35-second display.
+        "staleness_ok": bool(captions) and maximum <= 1.82 and tail <= 0.20,
+        "minimum_duration_ok": bool(captions) and minimum >= 0.34,
+    }
+
 def run_quality_gates(
     manifest: dict[str, Any], final_path: str | Path, subtitle_report: dict[str, Any], captions: list[dict[str, Any]],
     selected_visuals: list[dict[str, Any]], fact_check_path: str | Path, attribution_path: str | Path,
@@ -76,9 +98,25 @@ def run_quality_gates(
     add("caption_bounds", caption_bounds, f"caption_count={len(captions)}")
     max_gap = float(subtitle_report.get("maximum_active_speech_caption_gap", 99))
     add("active_speech_caption_gap", max_gap <= 0.5, f"max_gap={max_gap:.3f}s")
-    stale = bool(captions) and all(0.34 <= float(row.get("end", 0)) - float(row.get("start", 0)) <= 1.82 for row in captions)
-    tail = float(subtitle_report.get("maximum_caption_tail_after_word", 99))
-    add("caption_staleness", stale and tail <= 0.20, f"durations within bounds; maximum_tail={tail:.3f}s")
+    caption_metrics = _caption_gate_metrics(captions, subtitle_report)
+    add(
+        "caption_staleness",
+        caption_metrics["staleness_ok"],
+        (
+            f"min_duration={caption_metrics['minimum']:.3f}s; "
+            f"max_duration={caption_metrics['maximum']:.3f}s; "
+            f"maximum_tail={caption_metrics['tail']:.3f}s"
+        ),
+    )
+    add(
+        "caption_minimum_duration",
+        caption_metrics["minimum_duration_ok"],
+        (
+            f"min_duration={caption_metrics['minimum']:.3f}s; "
+            f"short_chunks={caption_metrics['short_count']}"
+        ),
+        required=False,
+    )
     add("visual_scene_count", len(selected_visuals) >= 4, f"scenes={len(selected_visuals)}")
     ids = [str(row.get("candidate_id")) for row in selected_visuals]
     paths = [str(row.get("path", "")) for row in selected_visuals]

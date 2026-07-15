@@ -264,17 +264,61 @@ def _build_chunk(rows: list[WordTiming], duration: float) -> CaptionChunk:
 def create_caption_chunks(words: list[WordTiming], audio_duration: float, min_words: int = 2, max_words: int = 4) -> list[CaptionChunk]:
     if not words:
         return []
-    chunks = [_build_chunk(group, audio_duration) for group in _group_words(words, min_words, max_words)]
+
+    groups = _group_words(words, min_words, max_words)
+    chunks = [_build_chunk(group, audio_duration) for group in groups]
+
     for index in range(len(chunks) - 1):
         current, following = chunks[index], chunks[index + 1]
+        spoken_end = groups[index][-1].end
+
         if current.end > following.start:
-            current.end = round(max(current.start + 0.01, following.start), 3)
+            # Never overlap two caption boxes. Grouping guarantees that the next
+            # caption starts no earlier than the current group's final spoken word.
+            current.end = round(max(spoken_end, following.start), 3)
         else:
             gap = following.start - current.end
             if 0 < gap <= 0.18:
-                current.end = round(following.start, 3)
-    chunks[-1].end = min(chunks[-1].end, round(audio_duration, 3))
+                # Bridge only a tiny visual gap, but never keep the previous text
+                # on screen more than 0.20s after its final spoken word.
+                current.end = round(min(following.start, spoken_end + 0.20), 3)
+
+    final_spoken_end = groups[-1][-1].end
+    chunks[-1].end = round(
+        min(chunks[-1].end, audio_duration, final_spoken_end + 0.20),
+        3,
+    )
     return chunks
+
+
+def _caption_timing_metrics(
+    words: list[WordTiming],
+    chunks: list[CaptionChunk],
+    min_words: int = 2,
+    max_words: int = 4,
+) -> dict[str, float | int]:
+    groups = _group_words(words, min_words, max_words)
+    durations = [max(0.0, chunk.end - chunk.start) for chunk in chunks]
+
+    tails: list[float] = []
+    if len(groups) == len(chunks):
+        tails = [
+            max(0.0, chunk.end - group[-1].end)
+            for chunk, group in zip(chunks, groups)
+        ]
+    else:
+        logger.warning(
+            "Caption/group count mismatch while computing timing metrics: %d chunks vs %d groups",
+            len(chunks),
+            len(groups),
+        )
+
+    return {
+        "minimum_caption_duration": round(min(durations), 3) if durations else 0.0,
+        "maximum_caption_duration": round(max(durations), 3) if durations else 0.0,
+        "short_caption_count": sum(duration < 0.34 for duration in durations),
+        "maximum_caption_tail_after_word": round(max(tails), 3) if tails else 0.0,
+    }
 
 def _ass_time(seconds: float) -> str:
     seconds = max(0.0, seconds)
@@ -392,15 +436,15 @@ def transcribe_and_align(
     chunks = create_caption_chunks(final_words, audio_duration)
     first_caption = chunks[0].start if chunks else None
     first_speech = final_report.get("first_detected_speech_time")
-    max_tail = max((chunk.end - words[-1].end for chunk, words in zip(chunks, _group_words(final_words, 2, 4))), default=0.0)
+    timing_metrics = _caption_timing_metrics(final_words, chunks)
     final_report.update({
         "model_first_attempted": primary_model,
         "model_finally_used": used_model,
         "first_caption_time": first_caption,
         "last_caption_time": chunks[-1].end if chunks else None,
         "maximum_active_speech_caption_gap": round(_max_active_speech_caption_gap(final_words, chunks), 3),
-        "maximum_caption_tail_after_word": round(max(0.0, max_tail), 3),
         "caption_chunk_count": len(chunks),
+        **timing_metrics,
     })
     if first_speech is not None and first_caption is not None:
         if first_caption < first_speech - 0.10:

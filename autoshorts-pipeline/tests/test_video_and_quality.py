@@ -45,3 +45,19 @@ def test_final_duration_gate(tmp_path):
     results = run_quality_gates(manifest, output, subtitle_report, captions, visuals, fact, attribution, history, 2.5, 3.5)
     duration_gate = next(row for row in results if row.name == "duration_range")
     assert duration_gate.passed
+
+
+def test_short_caption_is_not_misclassified_as_stale():
+    from src.quality_gates import _caption_gate_metrics
+
+    captions = [
+        {"text": "fast", "start": 0.0, "end": 0.22},
+        {"text": "speech continues", "start": 0.22, "end": 0.92},
+    ]
+    report = {
+        "maximum_caption_tail_after_word": 0.14,
+        "short_caption_count": 1,
+    }
+    metrics = _caption_gate_metrics(captions, report)
+    assert metrics["staleness_ok"] is True
+    assert metrics["minimum_duration_ok"] is False
