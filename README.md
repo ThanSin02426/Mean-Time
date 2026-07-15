@@ -39,8 +39,9 @@ Pipeline order:
 
 ```text
 reserve topic without mutating queue
-→ generate structured sourced script
-→ verify factual source URLs
+→ generate a structured script with no model-written URLs
+→ reuse a live-verified topic source cache or run one batched grounded repair
+→ verify the resolved factual source URLs
 → synthesize TTS
 → trim silence once into output/narration_final.wav
 → transcribe that exact WAV with faster-whisper
@@ -75,6 +76,7 @@ autoshorts-pipeline/
   topic_state.json
   queue_transaction.json
   upload_history.json
+  fact_source_cache.json
 ```
 
 ## Prerequisites
@@ -266,6 +268,20 @@ The aligner normalizes punctuation, apostrophes, whitespace, and common numeric 
 - caption timestamps within the final video
 
 Set `RENDER_SUBTITLE_TEST=true` locally to also produce `output/subtitle_test.mp4`.
+
+
+## Factual source verification
+
+The script model is not allowed to invent URLs. Every generated scene starts with an empty `sources` list. The pipeline then:
+
+1. checks `fact_source_cache.json` for an exact normalized topic match and live-verifies every cached URL;
+2. on a cache miss, performs one Google Search-grounded repair request for all failed scenes together;
+3. allows at most one supplemental grounded search for an additional independent source;
+4. accepts either one reachable primary source or two independent reachable reputable science sources;
+5. saves successful topic-level sources back to `fact_source_cache.json`;
+6. stops immediately on a quota error instead of retrying once or twice per scene.
+
+This caps source-repair usage at two Gemini calls per run instead of up to two calls for every scene. Cache entries are committed only after a successful queue transaction.
 
 ## Visual selection
 

@@ -95,6 +95,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          FACT_SOURCE_CACHE_FILE: fact_source_cache.json
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -146,7 +147,8 @@ jobs:
             autoshorts-pipeline/topic_state.json \
             autoshorts-pipeline/topic_bank.json \
             autoshorts-pipeline/queue_transaction.json \
-            autoshorts-pipeline/upload_history.json
+            autoshorts-pipeline/upload_history.json \
+            autoshorts-pipeline/fact_source_cache.json
           if git -C .. diff --cached --quiet; then
             echo "status=no_changes" >> "$GITHUB_OUTPUT"
             echo "QUEUE COMMIT STATUS: no changes"
@@ -202,6 +204,7 @@ jobs:
             autoshorts-pipeline/topics.txt
             autoshorts-pipeline/topic_state.json
             autoshorts-pipeline/topic_bank.json
+            autoshorts-pipeline/fact_source_cache.json
 
       - name: Write run summary
         if: always()

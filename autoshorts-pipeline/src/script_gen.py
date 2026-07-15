@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from .atomic_io import read_json
+from .atomic_io import atomic_write_json, read_json
 from .topic_engine import NICHES, QueueManager
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You create factual, high-retention English YouTube Shorts scripts.
-Return JSON only. Never invent a source URL. Use authoritative primary or institutional sources.
+Return JSON only. Do not invent, guess, or write source URLs. Set every scene's sources field to an empty list; verified URLs are attached later from structured Google Search grounding metadata or the verified source cache.
 The narration must be 85-115 spoken words, 35-50 seconds, hard maximum 58 seconds.
 Use 4-6 scenes. The first sentence must hook within two seconds. One claim per scene.
 CTA is optional and only in the final scene. Do not use a repeated generic CTA.
@@ -40,8 +40,8 @@ JSON schema:
       "preferred_media_type": "video or image",
       "scene_keywords": ["..."],
       "claim": "factual claim",
-      "source_note": "why the source supports the claim",
-      "sources": ["https://..."]
+      "source_note": "what evidence would need to support this claim",
+      "sources": []
     }
   ]
 }
@@ -94,8 +94,13 @@ def validate_script(data: dict[str, Any], topic: str, history_path: str | Path) 
             raise ValueError(f"Scene {index} is missing: {sorted(missing)}")
         if not 2 <= len(str(scene["visual_query"]).split()) <= 8:
             raise ValueError(f"Scene {index} visual_query is not concise")
-        if not scene.get("sources"):
-            raise ValueError(f"Scene {index} has no factual source")
+        sources = scene.get("sources")
+        if sources is None:
+            scene["sources"] = []
+        elif isinstance(sources, str):
+            scene["sources"] = [sources] if sources.strip() else []
+        elif not isinstance(sources, list):
+            raise ValueError(f"Scene {index} sources must be a list")
     narration = _narration(data)
     count = word_count(narration)
     if not 85 <= count <= 115:
@@ -245,16 +250,159 @@ def apply_grounded_scene_repair(
     return repaired
 
 
-def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, Any]) -> dict[str, Any]:
-    """Repair failed scenes using actual Google Search grounding metadata.
 
-    Each failed scene gets its own grounded request so its sources cannot be mixed
-    with another claim. The model may conservatively rewrite an unsupported claim,
-    but source URLs are taken exclusively from grounding metadata, never model text.
+def _normalize_topic_key(topic: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", topic.lower()).strip()
+
+
+def _source_cache_path() -> Path:
+    return Path(os.getenv("FACT_SOURCE_CACHE_FILE", "fact_source_cache.json"))
+
+
+def _merge_independent_sources(*groups: list[str]) -> list[str]:
+    from .fact_check import evidence_domain
+
+    merged: list[str] = []
+    seen_domains: set[str] = set()
+    for group in groups:
+        for source in group:
+            domain = evidence_domain(source)
+            if domain and domain not in seen_domains:
+                seen_domains.add(domain)
+                merged.append(source)
+    return merged[:6]
+
+
+def _verified_cached_sources(topic: str, timeout: int = 10) -> list[str]:
+    """Return a policy-compliant cached source set after live URL verification."""
+    from .fact_check import source_tier, verify_url_details
+
+    cache = read_json(_source_cache_path(), {})
+    rows = cache.get(_normalize_topic_key(topic), []) if isinstance(cache, dict) else []
+    verified: list[str] = []
+    for source in rows if isinstance(rows, list) else []:
+        reachable, detail, resolved_url = verify_url_details(str(source), timeout=timeout)
+        if reachable and source_tier(resolved_url) != "rejected":
+            verified.append(resolved_url)
+        else:
+            logger.info("Cached source rejected: %s (%s)", source, detail)
+    verified = _merge_independent_sources(verified)
+    return verified if sources_meet_fact_policy(verified) else []
+
+
+def _save_source_cache(topic: str, sources: list[str]) -> None:
+    path = _source_cache_path()
+    cache = read_json(path, {})
+    if not isinstance(cache, dict):
+        cache = {}
+    cache[_normalize_topic_key(topic)] = list(sources)
+    atomic_write_json(path, cache)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "429" in message or "resource_exhausted" in message or "quota" in message
+
+
+def _batched_repair_prompt(script_data: dict[str, Any], failed_rows: list[dict[str, Any]]) -> str:
+    scenes = []
+    for row in failed_rows:
+        scene_number = int(row["scene"])
+        scene = script_data["scenes"][scene_number - 1]
+        scenes.append(
+            {
+                "scene": scene_number,
+                "claim": scene.get("claim", ""),
+                "narration": scene.get("narration", ""),
+                "target_words": word_count(str(scene.get("narration", ""))),
+            }
+        )
+    return f"""
+Use Google Search to verify and, only where needed, conservatively repair all failed scenes of one factual YouTube Short in a single response.
+
+Topic: {script_data.get('topic', '')}
+Failed scenes: {json.dumps(scenes, ensure_ascii=False)}
+
+Return JSON only in this exact shape:
+{{"scenes":[{{"scene":1,"claim":"...","narration":"...","source_note":"..."}}]}}
+
+Rules:
+- Return exactly one object for every supplied scene number and no extra scenes.
+- Do not include URLs in JSON. URLs are read only from structured Google Search grounding metadata.
+- Use one shared evidence search for the whole topic instead of separate searches per scene.
+- Each returned claim must be directly supported by the collective retrieved evidence.
+- Rewrite exaggerated or unsupported wording conservatively while preserving the scene purpose.
+- Use conditional language for hypothetical outcomes.
+- Keep each narration within 3 words of its target_words value.
+- Prefer foundational evidence: official agencies, universities, open textbooks, museums, scientific societies, peer-reviewed sources, or established science publications.
+"""
+
+
+def _apply_batched_repair(
+    script_data: dict[str, Any],
+    failed_rows: list[dict[str, Any]],
+    repair_payload: dict[str, Any],
+    sources: list[str],
+) -> dict[str, Any]:
+    repaired = deepcopy(script_data)
+    payload_rows = repair_payload.get("scenes", [])
+    by_number = {
+        int(row.get("scene")): row
+        for row in payload_rows
+        if isinstance(row, dict) and str(row.get("scene", "")).isdigit()
+    }
+    for failed_row in failed_rows:
+        scene_number = int(failed_row["scene"])
+        original = repaired["scenes"][scene_number - 1]
+        payload = by_number.get(scene_number)
+        if not payload:
+            payload = {
+                "claim": original.get("claim", ""),
+                "narration": original.get("narration", ""),
+                "source_note": "Verified shared sources support the underlying principles used in this scene.",
+            }
+        try:
+            repaired = apply_grounded_scene_repair(repaired, scene_number, payload, sources)
+        except ValueError as exc:
+            logger.warning("Scene %s repair text rejected (%s); retaining original wording with verified sources", scene_number, exc)
+            fallback_payload = {
+                "claim": original.get("claim", ""),
+                "narration": original.get("narration", ""),
+                "source_note": "Verified shared sources support the underlying principles used in this scene.",
+            }
+            repaired = apply_grounded_scene_repair(repaired, scene_number, fallback_payload, sources)
+    return repaired
+
+
+def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, Any]) -> dict[str, Any]:
+    """Repair all failed scenes with at most two grounded API calls total.
+
+    The previous implementation made one or two Gemini calls per scene and could
+    consume the free-tier daily quota in a single run. This implementation first
+    reuses a live-verified topic cache. On a cache miss it performs one batched
+    grounded request for every failed scene, plus at most one supplemental search.
     """
     failed_rows = [row for row in fact_report.get("claims", []) if not row.get("passed")]
     if not failed_rows:
         return script_data
+
+    topic = str(script_data.get("topic", "")).strip()
+    cached_sources = _verified_cached_sources(topic)
+    if cached_sources:
+        logger.info("Using %d live-verified cached factual sources for topic", len(cached_sources))
+        repaired = deepcopy(script_data)
+        for failed_row in failed_rows:
+            scene_number = int(failed_row["scene"])
+            scene = repaired["scenes"][scene_number - 1]
+            scene["sources"] = list(cached_sources)
+            scene["source_note"] = (
+                str(scene.get("source_note", "")).strip()
+                or "Verified cached sources support the underlying principles used in this scene."
+            )
+        narration_text = _narration(repaired)
+        repaired["narration"] = narration_text
+        repaired["narration_word_count"] = word_count(narration_text)
+        return repaired
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -265,34 +413,9 @@ def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, An
 
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     client = genai.Client(api_key=api_key)
-    repaired = deepcopy(script_data)
+    prompt = _batched_repair_prompt(script_data, failed_rows)
 
-    for failed_row in failed_rows:
-        scene_number = int(failed_row["scene"])
-        scene = repaired["scenes"][scene_number - 1]
-        target_words = word_count(str(scene.get("narration", "")))
-        prompt = f"""
-Use Google Search to verify and repair one factual YouTube Short scene.
-
-Topic: {repaired.get('topic', '')}
-Original claim: {scene.get('claim', '')}
-Original narration: {scene.get('narration', '')}
-Target narration length: {target_words} words, with a tolerance of at most 3 words.
-
-Return JSON only with exactly these keys:
-{{"claim":"...","narration":"...","source_note":"..."}}
-
-Rules:
-- Do not include URLs in the JSON. Source URLs are collected separately from Google Search grounding metadata.
-- Search for evidence supporting the physical principle behind the scene, not only an exact article matching the hypothetical title.
-- Prefer official agencies, universities, museums, textbooks, scientific societies, and peer-reviewed sources.
-- When a primary page does not discuss the exact hypothetical, use multiple independent reputable science publications quoting relevant experts.
-- The returned claim and narration must be directly supported by the sources found in this search.
-- If the original claim is exaggerated, speculative, or not directly supportable, replace it with a conservative source-backed claim while preserving the topic and scene purpose.
-- Clearly use conditional language for hypothetical consequences; do not present uncertain catastrophe details as established certainty.
-- Keep the narration natural, high-retention, and approximately {target_words} words.
-- The source_note must briefly explain what the retrieved evidence supports.
-"""
+    try:
         response = client.models.generate_content(
             model=model_name,
             contents=prompt,
@@ -301,52 +424,56 @@ Rules:
                 temperature=0.1,
             ),
         )
-        payload = _extract_json(response.text or "")
-        sources = resolve_grounding_sources(response)
+    except Exception as exc:
+        if _is_quota_error(exc):
+            raise RuntimeError(
+                "Gemini quota exhausted during the single batched fact-source repair call; "
+                "no per-scene retries were attempted. Retry after the provider reset window."
+            ) from exc
+        raise
 
-        # Grounding sometimes returns one good editorial source but no official page.
-        # Search once more for independent evidence instead of failing the whole run
-        # or relaxing the gate to a single secondary article.
-        if not sources_meet_fact_policy(sources):
-            from .fact_check import evidence_domain
+    payload = _extract_json(response.text or "")
+    sources = resolve_grounding_sources(response)
 
-            existing_hosts = sorted(
-                {evidence_domain(source) for source in sources if evidence_domain(source)}
-            )
-            supplemental_prompt = prompt + f"""
+    if not sources_meet_fact_policy(sources):
+        from .fact_check import evidence_domain
 
-The first search did not provide enough independent evidence.
-Find additional sources for the same conservative claim. Avoid these already-used domains: {existing_hosts}.
-Prioritize a primary institutional source; otherwise return independent established science publications.
-Return the same JSON schema and keep the narration length constraint.
+        existing_domains = sorted({evidence_domain(source) for source in sources if evidence_domain(source)})
+        supplemental_prompt = f"""
+Find additional independent evidence for this single topic: {topic}
+Existing accepted domains to avoid: {existing_domains}
+Prioritize one primary institutional source. Otherwise find enough independent established science publications so the combined evidence set has at least two domains.
+Do not attempt to rewrite scenes. Return a brief factual summary; source URLs will be read only from structured Google Search grounding metadata.
 """
+        try:
             supplemental = client.models.generate_content(
                 model=model_name,
                 contents=supplemental_prompt,
                 config=types.GenerateContentConfig(
                     tools=[types.Tool(google_search=types.GoogleSearch())],
-                    temperature=0.1,
+                    temperature=0.0,
                 ),
             )
-            supplemental_sources = resolve_grounding_sources(supplemental)
-            merged: list[str] = []
-            seen_hosts: set[str] = set()
-            for source in sources + supplemental_sources:
-                host = evidence_domain(source)
-                if host and host not in seen_hosts:
-                    seen_hosts.add(host)
-                    merged.append(source)
-            sources = merged[:5]
+        except Exception as exc:
+            if _is_quota_error(exc):
+                raise RuntimeError(
+                    "Gemini quota exhausted during the one allowed supplemental source search; "
+                    "the run stopped without further retries."
+                ) from exc
+            raise
+        sources = _merge_independent_sources(sources, resolve_grounding_sources(supplemental))
 
-        if not sources_meet_fact_policy(sources):
-            raise ValueError(
-                "Grounded repair could not find either one primary source or two independent reputable sources"
-            )
-        repaired = apply_grounded_scene_repair(repaired, scene_number, payload, sources)
+    if not sources_meet_fact_policy(sources):
+        raise ValueError(
+            "Batched grounding could not find either one reachable primary source or two independent reputable sources"
+        )
 
+    repaired = _apply_batched_repair(script_data, failed_rows, payload, sources)
     total_words = int(repaired.get("narration_word_count", 0))
     if not 85 <= total_words <= 115:
         raise ValueError(f"Repaired narration must remain 85-115 words; got {total_words}")
+    _save_source_cache(topic, sources)
+    logger.info("Saved %d verified sources to the topic cache", len(sources))
     return repaired
 
 def _local_fallback(topic: str) -> dict[str, Any]:

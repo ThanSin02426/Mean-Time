@@ -288,3 +288,147 @@ def test_sources_meet_fact_policy_requires_independence():
         "https://www.space.com/a",
         "https://www.astronomy.com/b",
     ])
+
+
+def _four_scene_script(topic: str = "A test topic") -> dict:
+    narration = "Air and oceans retain their motion through inertia when a rotating system changes suddenly, so effects depend on forces and stopping time."
+    return {
+        "topic": topic,
+        "narration": " ".join([narration] * 4),
+        "narration_word_count": 88,
+        "scenes": [
+            {
+                "narration": narration,
+                "claim": f"claim {index}",
+                "source_note": "needs evidence",
+                "sources": [],
+            }
+            for index in range(1, 5)
+        ],
+    }
+
+
+def test_verified_topic_cache_avoids_all_gemini_repair_calls(monkeypatch, tmp_path: Path):
+    import json
+
+    from src.script_gen import repair_script_sources
+
+    topic = "What would happen if Earth stopped spinning for one second"
+    cache = tmp_path / "fact_source_cache.json"
+    cache.write_text(
+        json.dumps(
+            {
+                topic.lower(): [
+                    "https://science.nasa.gov/earth/facts/",
+                    "https://openstax.org/books/physics/pages/4-2-newtons-first-law-of-motion-inertia",
+                ]
+            }
+        )
+    )
+    monkeypatch.setenv("FACT_SOURCE_CACHE_FILE", str(cache))
+    monkeypatch.setattr(
+        "src.fact_check.verify_url_details",
+        lambda url, timeout=10: (True, "HTTP 200", url),
+    )
+
+    script = _four_scene_script(topic)
+    fact_report = {
+        "passed": False,
+        "claims": [{"scene": index, "passed": False} for index in range(1, 5)],
+    }
+    repaired = repair_script_sources(script, fact_report)
+    for scene in repaired["scenes"]:
+        assert scene["sources"] == [
+            "https://science.nasa.gov/earth/facts/",
+            "https://openstax.org/books/physics/pages/4-2-newtons-first-law-of-motion-inertia",
+        ]
+
+
+def test_batched_repair_uses_one_grounded_call_for_all_failed_scenes(monkeypatch, tmp_path: Path):
+    import json
+    import sys
+    from types import ModuleType
+
+    from src.script_gen import repair_script_sources
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("FACT_SOURCE_CACHE_FILE", str(tmp_path / "empty-cache.json"))
+
+    script = _four_scene_script("Batch topic")
+    failed = [{"scene": index, "passed": False} for index in range(1, 5)]
+    payload = {
+        "scenes": [
+            {
+                "scene": index,
+                "claim": script["scenes"][index - 1]["claim"],
+                "narration": script["scenes"][index - 1]["narration"],
+                "source_note": "Shared grounded sources support this scene.",
+            }
+            for index in range(1, 5)
+        ]
+    }
+    response = _grounding_response(("https://redirect/space", "Space"), ("https://redirect/live", "Live"))
+    response.text = json.dumps(payload)
+    calls = {"count": 0}
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["count"] += 1
+            return response
+
+    genai_module = ModuleType("google.genai")
+    genai_module.Client = lambda api_key: SimpleNamespace(models=FakeModels())
+    genai_module.types = SimpleNamespace(
+        GenerateContentConfig=lambda **kwargs: kwargs,
+        Tool=lambda **kwargs: kwargs,
+        GoogleSearch=lambda: {},
+    )
+    google_module = ModuleType("google")
+    google_module.genai = genai_module
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.genai", genai_module)
+    monkeypatch.setattr(
+        "src.script_gen.resolve_grounding_sources",
+        lambda response: ["https://www.space.com/a", "https://www.livescience.com/b"],
+    )
+
+    repaired = repair_script_sources(script, {"passed": False, "claims": failed})
+    assert calls["count"] == 1
+    assert all(len(scene["sources"]) == 2 for scene in repaired["scenes"])
+
+
+def test_quota_error_stops_after_single_batched_call(monkeypatch, tmp_path: Path):
+    import sys
+    from types import ModuleType
+
+    import pytest
+
+    from src.script_gen import repair_script_sources
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("FACT_SOURCE_CACHE_FILE", str(tmp_path / "empty-cache.json"))
+    calls = {"count": 0}
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["count"] += 1
+            raise RuntimeError("429 RESOURCE_EXHAUSTED quota exceeded")
+
+    genai_module = ModuleType("google.genai")
+    genai_module.Client = lambda api_key: SimpleNamespace(models=FakeModels())
+    genai_module.types = SimpleNamespace(
+        GenerateContentConfig=lambda **kwargs: kwargs,
+        Tool=lambda **kwargs: kwargs,
+        GoogleSearch=lambda: {},
+    )
+    google_module = ModuleType("google")
+    google_module.genai = genai_module
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.genai", genai_module)
+
+    with pytest.raises(RuntimeError, match="single batched fact-source repair call"):
+        repair_script_sources(
+            _four_scene_script("Quota topic"),
+            {"passed": False, "claims": [{"scene": 1, "passed": False}]},
+        )
+    assert calls["count"] == 1

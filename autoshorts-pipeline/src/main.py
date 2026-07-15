@@ -79,22 +79,13 @@ def run_pipeline(topic: str | None, publish: bool, settings: Settings, network_f
         manifest.save(manifest_path)
 
         fact_report = build_fact_check(script, settings.output_dir / "fact_check.json", network_verify=network_fact_check)
-        repair_attempts = max(0, int(os.getenv("FACT_SOURCE_REPAIR_ATTEMPTS", "2")))
-        for attempt in range(repair_attempts):
-            if fact_report["passed"] or script.get("generation_mode") != "gemini":
-                break
+        if not fact_report["passed"] and script.get("generation_mode") == "gemini":
             failed_scenes = [row.get("scene") for row in fact_report.get("claims", []) if not row.get("passed")]
             logger.warning(
-                "Fact-check failed for scenes %s; attempting grounded source repair %d/%d",
+                "Fact-check failed for scenes %s; performing one batched source repair",
                 failed_scenes,
-                attempt + 1,
-                repair_attempts,
             )
-            try:
-                script = repair_script_sources(script, fact_report)
-            except Exception as repair_exc:
-                logger.warning("Automatic source repair attempt %d failed: %s", attempt + 1, repair_exc)
-                continue
+            script = repair_script_sources(script, fact_report)
             manifest.script = script
             manifest.scene_list = script["scenes"]
             manifest.exact_narration_text = script["narration"]
@@ -116,7 +107,7 @@ def run_pipeline(topic: str | None, publish: bool, settings: Settings, network_f
                 ) or "no source URLs"
                 failed_details.append(f"scene {row.get('scene')}: {statuses}")
             raise RuntimeError(
-                "Fact-check gate failed after source repair: " + "; ".join(failed_details)
+                "Fact-check gate failed after one batched source repair: " + "; ".join(failed_details)
             )
 
         raw_audio = settings.work_dir / "narration_raw.mp3"
