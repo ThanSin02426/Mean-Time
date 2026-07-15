@@ -112,6 +112,100 @@ def _recognized_tokens(words: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _nearest_recognized_bounds(
+    script_index: int,
+    mapping: dict[int, tuple[int, int]],
+    recognized_count: int,
+) -> tuple[int, int]:
+    previous = [index for index in mapping if index < script_index]
+    following = [index for index in mapping if index > script_index]
+    left = mapping[max(previous)][1] + 1 if previous else 0
+    right = mapping[min(following)][0] if following else recognized_count
+    return left, right
+
+
+def _augment_compound_matches(
+    scripted: list[dict[str, Any]],
+    recognized: list[dict[str, Any]],
+    mapping: dict[int, tuple[int, int]],
+) -> dict[int, tuple[float, float, str]]:
+    """Match tokenization differences without borrowing surrounding silence.
+
+    Whisper may split a script word (``landmasses`` -> ``land`` ``masses``)
+    or merge adjacent script words. Exact sequence matching treats those as
+    omissions, and the old interpolation then stretched the missing word to
+    the next matched word, including any sentence pause.
+    """
+    timings: dict[int, tuple[float, float, str]] = {}
+    used_recognized = {index for span in mapping.values() for index in range(span[0], span[1] + 1)}
+
+    # One script token represented by two to four Whisper tokens.
+    for script_index, script_row in enumerate(scripted):
+        if script_index in mapping:
+            continue
+        left, right = _nearest_recognized_bounds(script_index, mapping, len(recognized))
+        found: tuple[int, int] | None = None
+        for width in range(2, 5):
+            for recognized_start in range(left, right - width + 1):
+                recognized_end = recognized_start + width - 1
+                span_indices = range(recognized_start, recognized_end + 1)
+                if any(index in used_recognized for index in span_indices):
+                    continue
+                joined = "".join(recognized[index]["normalized"] for index in span_indices)
+                if joined == script_row["normalized"]:
+                    found = (recognized_start, recognized_end)
+                    break
+            if found:
+                break
+        if found:
+            mapping[script_index] = found
+            used_recognized.update(range(found[0], found[1] + 1))
+            timings[script_index] = (
+                float(recognized[found[0]]["start"]),
+                float(recognized[found[1]]["end"]),
+                "whisper_split",
+            )
+
+    # Two to four script tokens represented by one Whisper token.
+    script_index = 0
+    while script_index < len(scripted):
+        if script_index in mapping:
+            script_index += 1
+            continue
+        matched_width = 0
+        for width in range(2, 5):
+            if script_index + width > len(scripted):
+                break
+            script_span = range(script_index, script_index + width)
+            if any(index in mapping for index in script_span):
+                continue
+            left, right = _nearest_recognized_bounds(script_index, mapping, len(recognized))
+            target = "".join(scripted[index]["normalized"] for index in script_span)
+            candidate = next((
+                index for index in range(left, right)
+                if index not in used_recognized and recognized[index]["normalized"] == target
+            ), None)
+            if candidate is None:
+                continue
+
+            source_start = float(recognized[candidate]["start"])
+            source_end = float(recognized[candidate]["end"])
+            total_units = sum(max(1, len(scripted[index]["normalized"])) for index in script_span)
+            cursor = source_start
+            for offset, index in enumerate(script_span):
+                units = max(1, len(scripted[index]["normalized"]))
+                end = source_end if offset == width - 1 else cursor + (source_end - source_start) * units / total_units
+                mapping[index] = (candidate, candidate)
+                timings[index] = (cursor, end, "whisper_merged")
+                cursor = end
+            used_recognized.add(candidate)
+            matched_width = width
+            break
+        script_index += matched_width or 1
+
+    return timings
+
+
 def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]], duration: float) -> tuple[list[WordTiming], dict[str, Any]]:
     scripted = script_tokens(script)
     recognized = _recognized_tokens(whisper_words)
@@ -121,22 +215,29 @@ def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]]
     script_norm = [row["normalized"] for row in scripted]
     whisper_norm = [row["normalized"] for row in recognized]
     matcher = SequenceMatcher(a=script_norm, b=whisper_norm, autojunk=False)
-    mapping: dict[int, int] = {}
+    mapping: dict[int, tuple[int, int]] = {}
     for block in matcher.get_matching_blocks():
         for offset in range(block.size):
-            mapping[block.a + offset] = block.b + offset
+            mapping[block.a + offset] = (block.b + offset, block.b + offset)
+
+    compound_timings = _augment_compound_matches(scripted, recognized, mapping)
 
     aligned: list[WordTiming | None] = [None] * len(scripted)
-    for script_index, whisper_index in mapping.items():
-        source = recognized[whisper_index]
-        start = min(max(0.0, source["start"]), duration)
-        end = min(max(start + 0.03, source["end"]), duration)
+    for script_index, recognized_span in mapping.items():
+        if script_index in compound_timings:
+            raw_start, raw_end, source_name = compound_timings[script_index]
+        else:
+            raw_start = float(recognized[recognized_span[0]]["start"])
+            raw_end = float(recognized[recognized_span[1]]["end"])
+            source_name = "whisper"
+        start = min(max(0.0, raw_start), duration)
+        end = min(max(start + 0.03, raw_end), duration)
         aligned[script_index] = WordTiming(
             scripted[script_index]["display"], scripted[script_index]["normalized"],
-            start, end, "whisper", True,
+            start, end, source_name, True,
         )
 
-    matched_indices = sorted(mapping)
+    matched_indices = [index for index, row in enumerate(aligned) if row is not None]
     if not matched_indices:
         step = duration / len(scripted)
         aligned = [
@@ -153,11 +254,11 @@ def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]]
             right_start = aligned[right_index].start if right_index < len(scripted) and aligned[right_index] else duration
             available = max(0.03 * len(missing), right_start - left_end)
             step = available / len(missing)
-            for offset, script_index in enumerate(missing):
-                start = min(duration, left_end + offset * step)
-                end = min(duration, max(start + 0.03, left_end + (offset + 1) * step))
-                row = scripted[script_index]
-                aligned[script_index] = WordTiming(row["display"], row["normalized"], start, end, "interpolated", False)
+            for offset, missing_index in enumerate(missing):
+                missing_start = min(duration, left_end + offset * step)
+                missing_end = min(duration, max(missing_start + 0.03, left_end + (offset + 1) * step))
+                row = scripted[missing_index]
+                aligned[missing_index] = WordTiming(row["display"], row["normalized"], missing_start, missing_end, "interpolated", False)
 
     output = [row for row in aligned if row is not None]
     previous_end = 0.0
@@ -184,6 +285,8 @@ def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]]
         "raw_whisper_word_count": len(recognized),
         "matched_script_words": matched_count,
         "raw_coverage_ratio": round(raw_coverage, 4),
+        "compound_split_matches": sum(row.source == "whisper_split" for row in output),
+        "compound_merged_matches": sum(row.source == "whisper_merged" for row in output),
         "final_aligned_word_count": len(output),
         "final_alignment_ratio": round(len(output) / len(scripted), 4),
         "first_detected_speech_time": round(recognized[0]["start"], 3) if recognized else None,

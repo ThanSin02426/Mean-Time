@@ -107,3 +107,45 @@ def test_tiny_gap_bridge_never_creates_stale_caption_tail():
     chunks = create_caption_chunks(words, 1.3)
     assert chunks[0].end - words[1].end <= 0.20 + 0.001
     assert _max_active_speech_caption_gap(words, chunks) <= 0.001
+
+
+def test_whisper_split_compound_word_uses_recognized_span_not_sentence_pause():
+    script = "submerging vast landmasses. The atmosphere"
+    whisper = [
+        {"word": "submerging", "start": 22.21, "end": 22.75},
+        {"word": "vast", "start": 22.75, "end": 22.99},
+        {"word": "land", "start": 22.99, "end": 23.39},
+        {"word": "masses.", "start": 23.39, "end": 23.63},
+        {"word": "The", "start": 24.98, "end": 25.14},
+        {"word": "atmosphere", "start": 25.14, "end": 25.34},
+    ]
+
+    words, report = align_script_to_whisper(script, whisper, 25.5)
+    compound = next(word for word in words if word.normalized == "landmasses")
+    chunks = create_caption_chunks(words, 25.5)
+
+    assert compound.source == "whisper_split"
+    assert compound.matched is True
+    assert compound.start == 22.99
+    assert compound.end == 23.63
+    assert report["compound_split_matches"] == 1
+    assert max(chunk.end - chunk.start for chunk in chunks) <= 1.8 + 0.001
+    assert _max_active_speech_caption_gap(words, chunks) <= 0.001
+
+
+def test_whisper_merged_compound_word_distributes_time_across_script_words():
+    script = "ice cream melts"
+    whisper = [
+        {"word": "icecream", "start": 0.20, "end": 0.72},
+        {"word": "melts", "start": 0.74, "end": 1.02},
+    ]
+
+    words, report = align_script_to_whisper(script, whisper, 1.2)
+
+    assert [word.normalized for word in words] == ["ice", "cream", "melts"]
+    assert words[0].source == "whisper_merged"
+    assert words[1].source == "whisper_merged"
+    assert words[0].start == 0.2
+    assert words[1].end == 0.72
+    assert words[0].end == words[1].start
+    assert report["compound_merged_matches"] == 2
