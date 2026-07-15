@@ -97,6 +97,8 @@ def run_pipeline(topic: str | None, publish: bool, settings: Settings, network_f
                 continue
             manifest.script = script
             manifest.scene_list = script["scenes"]
+            manifest.exact_narration_text = script["narration"]
+            manifest.narration_word_count = int(script["narration_word_count"])
             manifest.save(manifest_path)
             fact_report = build_fact_check(
                 script,

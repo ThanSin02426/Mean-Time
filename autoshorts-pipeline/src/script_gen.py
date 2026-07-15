@@ -119,48 +119,100 @@ def validate_script(data: dict[str, Any], topic: str, history_path: str | Path) 
 
 
 
-def apply_source_repairs(
+
+def _value(obj: Any, name: str, default: Any = None) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+def extract_grounding_sources(response: Any) -> list[dict[str, str]]:
+    """Extract sources returned by Google Search grounding metadata.
+
+    URLs written in model text are never trusted. Only structured grounding chunks
+    supplied by the Gemini API are accepted.
+    """
+    sources: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for candidate in _value(response, "candidates", []) or []:
+        metadata = _value(candidate, "grounding_metadata")
+        if metadata is None:
+            metadata = _value(candidate, "groundingMetadata")
+        for chunk in _value(metadata, "grounding_chunks", []) or _value(metadata, "groundingChunks", []) or []:
+            web = _value(chunk, "web")
+            uri = str(_value(web, "uri", "") or "").strip()
+            title = str(_value(web, "title", "") or "").strip()
+            if uri.startswith(("https://", "http://")) and uri not in seen:
+                seen.add(uri)
+                sources.append({"url": uri, "title": title})
+    return sources
+
+
+def resolve_grounding_sources(response: Any, timeout: int = 10) -> list[str]:
+    """Resolve grounding redirects and retain reachable authoritative destinations."""
+    from .fact_check import is_authoritative, verify_url_details
+
+    accepted: list[str] = []
+    for source in extract_grounding_sources(response):
+        reachable, detail, resolved_url = verify_url_details(source["url"], timeout=timeout)
+        if not reachable:
+            logger.info("Grounding source rejected as unreachable: %s (%s)", source["url"], detail)
+            continue
+        if not is_authoritative(resolved_url):
+            logger.info("Grounding source rejected as non-authoritative: %s", resolved_url)
+            continue
+        if resolved_url not in accepted:
+            accepted.append(resolved_url)
+    return accepted
+
+
+def apply_grounded_scene_repair(
     script_data: dict[str, Any],
+    scene_number: int,
     repair_payload: dict[str, Any],
-    failed_scene_numbers: set[int],
+    sources: list[str],
 ) -> dict[str, Any]:
-    """Apply source-only repairs without changing narration, claims, or scene order."""
+    """Apply one evidence-backed scene repair using API-provided source metadata."""
     repaired = deepcopy(script_data)
     scenes = repaired.get("scenes", [])
-    applied = 0
-    for row in repair_payload.get("repairs", []):
-        try:
-            scene_number = int(row.get("scene"))
-        except (TypeError, ValueError):
-            continue
-        if scene_number not in failed_scene_numbers or not 1 <= scene_number <= len(scenes):
-            continue
-        sources = row.get("sources") or []
-        if isinstance(sources, str):
-            sources = [sources]
-        cleaned: list[str] = []
-        for source in sources:
-            value = str(source).strip()
-            if value.startswith(("https://", "http://")) and value not in cleaned:
-                cleaned.append(value)
-        if not cleaned:
-            continue
-        scene = scenes[scene_number - 1]
-        scene["sources"] = cleaned
-        note = str(row.get("source_note", "")).strip()
-        if note:
-            scene["source_note"] = note
-        applied += 1
-    if applied == 0:
-        raise ValueError("Source repair response did not contain usable replacements for failed scenes")
+    if not 1 <= scene_number <= len(scenes):
+        raise ValueError(f"Invalid scene number: {scene_number}")
+    if not sources:
+        raise ValueError("Grounded repair returned no reachable authoritative sources")
+
+    scene = scenes[scene_number - 1]
+    original_words = word_count(str(scene.get("narration", "")))
+    claim = str(repair_payload.get("claim", "")).strip()
+    narration = str(repair_payload.get("narration", "")).strip()
+    source_note = str(repair_payload.get("source_note", "")).strip()
+    if not claim or not narration or not source_note:
+        raise ValueError("Grounded repair response is missing claim, narration, or source_note")
+    if abs(word_count(narration) - original_words) > 3:
+        raise ValueError(
+            f"Repaired scene narration changed too much: expected about {original_words} words, "
+            f"got {word_count(narration)}"
+        )
+
+    scene["claim"] = claim
+    scene["narration"] = narration
+    scene["source_note"] = source_note
+    scene["sources"] = sources
+
+    narration_text = _narration(repaired)
+    repaired["narration"] = narration_text
+    repaired["narration_word_count"] = word_count(narration_text)
     return repaired
 
 
 def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, Any]) -> dict[str, Any]:
-    """Use grounded Google Search once to replace only dead/non-authoritative URLs."""
+    """Repair failed scenes using actual Google Search grounding metadata.
+
+    Each failed scene gets its own grounded request so its sources cannot be mixed
+    with another claim. The model may conservatively rewrite an unsupported claim,
+    but source URLs are taken exclusively from grounding metadata, never model text.
+    """
     failed_rows = [row for row in fact_report.get("claims", []) if not row.get("passed")]
-    failed_scene_numbers = {int(row["scene"]) for row in failed_rows if row.get("scene")}
-    if not failed_scene_numbers:
+    if not failed_rows:
         return script_data
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
@@ -172,39 +224,47 @@ def repair_script_sources(script_data: dict[str, Any], fact_report: dict[str, An
 
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     client = genai.Client(api_key=api_key)
-    failed_context = []
-    for row in failed_rows:
-        scene_number = int(row["scene"])
-        scene = script_data["scenes"][scene_number - 1]
-        failed_context.append({
-            "scene": scene_number,
-            "claim": scene.get("claim", ""),
-            "source_note": scene.get("source_note", ""),
-            "failed_sources": row.get("sources", []),
-        })
+    repaired = deepcopy(script_data)
 
-    prompt = f"""
-Search the live web and repair ONLY the source URLs for the failed factual scenes below.
-Do not rewrite narration, claims, title, topic, or scene order.
-For each failed scene, return 2 or 3 direct, currently reachable URLs from authoritative primary or institutional sources that support the exact claim.
-Prefer NASA, NOAA, USGS, NIH, WHO, universities, peer-reviewed journals, museums, national academies, ESA, or CERN.
-Do not guess URLs. Do not use dead legacy paths, guessed /wp-content/uploads paths, search-result pages, or generic homepages when a claim-specific page exists.
-Return JSON only in this exact schema:
-{{"repairs":[{{"scene":1,"source_note":"why these sources support the claim","sources":["https://...","https://..."]}}]}}
+    for failed_row in failed_rows:
+        scene_number = int(failed_row["scene"])
+        scene = repaired["scenes"][scene_number - 1]
+        target_words = word_count(str(scene.get("narration", "")))
+        prompt = f"""
+Use Google Search to verify and repair one factual YouTube Short scene.
 
-Topic: {script_data.get('topic', '')}
-Failed scenes: {json.dumps(failed_context, ensure_ascii=False)}
+Topic: {repaired.get('topic', '')}
+Original claim: {scene.get('claim', '')}
+Original narration: {scene.get('narration', '')}
+Target narration length: {target_words} words, with a tolerance of at most 3 words.
+
+Return JSON only with exactly these keys:
+{{"claim":"...","narration":"...","source_note":"..."}}
+
+Rules:
+- Do not include URLs in the JSON. Source URLs are collected separately from Google Search grounding metadata.
+- The returned claim and narration must be directly supported by sources found in this search.
+- If the original claim is exaggerated, speculative, or not directly supportable, replace it with a conservative source-backed claim while preserving the topic and scene purpose.
+- Do not state unsupported catastrophe details as certainty.
+- Keep the narration natural, high-retention, and approximately {target_words} words.
+- The source_note must briefly explain what the retrieved evidence supports.
 """
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-            temperature=0.1,
-        ),
-    )
-    payload = _extract_json(response.text or "")
-    return apply_source_repairs(script_data, payload, failed_scene_numbers)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.1,
+            ),
+        )
+        payload = _extract_json(response.text or "")
+        sources = resolve_grounding_sources(response)
+        repaired = apply_grounded_scene_repair(repaired, scene_number, payload, sources)
+
+    total_words = int(repaired.get("narration_word_count", 0))
+    if not 85 <= total_words <= 115:
+        raise ValueError(f"Repaired narration must remain 85-115 words; got {total_words}")
+    return repaired
 
 def _local_fallback(topic: str) -> dict[str, Any]:
     niche = QueueManager.categorize(topic)
