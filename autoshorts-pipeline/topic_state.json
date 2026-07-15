@@ -1,7 +1,22 @@
 {
   "version": 2,
-  "recent_niches": [],
-  "recent_replacement_niches": [],
-  "used_topics": [],
-  "events": []
+  "recent_niches": [
+    "space"
+  ],
+  "recent_replacement_niches": [
+    "animals"
+  ],
+  "used_topics": [
+    "What would happen if Earth stopped spinning for one second"
+  ],
+  "events": [
+    {
+      "transaction_id": "8595da7ec2cf4652b721d338db2c250c",
+      "selected_topic": "What would happen if Earth stopped spinning for one second",
+      "selected_niche": "space",
+      "replacement_topic": "Why crows can remember human faces",
+      "replacement_niche": "animals",
+      "finalized_at": "2026-07-15T18:10:15.345978+00:00"
+    }
+  ]
 }
