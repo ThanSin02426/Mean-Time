@@ -8,6 +8,7 @@ from copy import deepcopy
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .atomic_io import read_json
 from .topic_engine import NICHES, QueueManager
@@ -149,21 +150,61 @@ def extract_grounding_sources(response: Any) -> list[dict[str, str]]:
 
 
 def resolve_grounding_sources(response: Any, timeout: int = 10) -> list[str]:
-    """Resolve grounding redirects and retain reachable authoritative destinations."""
-    from .fact_check import is_authoritative, verify_url_details
+    """Resolve grounding redirects and keep credible, reachable destinations.
 
-    accepted: list[str] = []
+    Primary institutional sources are preferred. Reputable science publications are
+    also retained because hypothetical science questions are often explained by
+    expert-reviewed editorial sources rather than a single official agency page.
+    The strict fact-check policy later requires either one primary source or two
+    independent reputable domains for every scene.
+    """
+    from .fact_check import evidence_domain, source_tier, verify_url_details
+
+    primary: list[str] = []
+    reputable: list[str] = []
+    seen_hosts: set[str] = set()
+
     for source in extract_grounding_sources(response):
         reachable, detail, resolved_url = verify_url_details(source["url"], timeout=timeout)
         if not reachable:
             logger.info("Grounding source rejected as unreachable: %s (%s)", source["url"], detail)
             continue
-        if not is_authoritative(resolved_url):
-            logger.info("Grounding source rejected as non-authoritative: %s", resolved_url)
+
+        tier = source_tier(resolved_url)
+        if tier == "rejected":
+            logger.info("Grounding source rejected by credibility policy: %s", resolved_url)
             continue
-        if resolved_url not in accepted:
-            accepted.append(resolved_url)
-    return accepted
+
+        host = evidence_domain(resolved_url)
+        if not host or host in seen_hosts:
+            continue
+        seen_hosts.add(host)
+
+        logger.info("Grounding source accepted (%s): %s", tier, resolved_url)
+        if tier == "primary":
+            primary.append(resolved_url)
+        else:
+            reputable.append(resolved_url)
+
+    # Keep the evidence list concise but diverse. Primary sources are first, while
+    # preserving at least two reputable domains when primary sources are absent.
+    return (primary + reputable)[:5]
+
+
+def sources_meet_fact_policy(sources: list[str]) -> bool:
+    """Return whether already-resolved sources satisfy the strict evidence policy."""
+    from .fact_check import evidence_domain, source_tier
+
+    primary_hosts: set[str] = set()
+    reputable_hosts: set[str] = set()
+    for source in sources:
+        host = evidence_domain(source)
+        tier = source_tier(source)
+        if tier == "primary" and host:
+            primary_hosts.add(host)
+        elif tier == "reputable" and host:
+            reputable_hosts.add(host)
+    return bool(primary_hosts) or len(reputable_hosts) >= 2
 
 
 def apply_grounded_scene_repair(
@@ -243,9 +284,12 @@ Return JSON only with exactly these keys:
 
 Rules:
 - Do not include URLs in the JSON. Source URLs are collected separately from Google Search grounding metadata.
-- The returned claim and narration must be directly supported by sources found in this search.
+- Search for evidence supporting the physical principle behind the scene, not only an exact article matching the hypothetical title.
+- Prefer official agencies, universities, museums, textbooks, scientific societies, and peer-reviewed sources.
+- When a primary page does not discuss the exact hypothetical, use multiple independent reputable science publications quoting relevant experts.
+- The returned claim and narration must be directly supported by the sources found in this search.
 - If the original claim is exaggerated, speculative, or not directly supportable, replace it with a conservative source-backed claim while preserving the topic and scene purpose.
-- Do not state unsupported catastrophe details as certainty.
+- Clearly use conditional language for hypothetical consequences; do not present uncertain catastrophe details as established certainty.
 - Keep the narration natural, high-retention, and approximately {target_words} words.
 - The source_note must briefly explain what the retrieved evidence supports.
 """
@@ -259,6 +303,45 @@ Rules:
         )
         payload = _extract_json(response.text or "")
         sources = resolve_grounding_sources(response)
+
+        # Grounding sometimes returns one good editorial source but no official page.
+        # Search once more for independent evidence instead of failing the whole run
+        # or relaxing the gate to a single secondary article.
+        if not sources_meet_fact_policy(sources):
+            from .fact_check import evidence_domain
+
+            existing_hosts = sorted(
+                {evidence_domain(source) for source in sources if evidence_domain(source)}
+            )
+            supplemental_prompt = prompt + f"""
+
+The first search did not provide enough independent evidence.
+Find additional sources for the same conservative claim. Avoid these already-used domains: {existing_hosts}.
+Prioritize a primary institutional source; otherwise return independent established science publications.
+Return the same JSON schema and keep the narration length constraint.
+"""
+            supplemental = client.models.generate_content(
+                model=model_name,
+                contents=supplemental_prompt,
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    temperature=0.1,
+                ),
+            )
+            supplemental_sources = resolve_grounding_sources(supplemental)
+            merged: list[str] = []
+            seen_hosts: set[str] = set()
+            for source in sources + supplemental_sources:
+                host = evidence_domain(source)
+                if host and host not in seen_hosts:
+                    seen_hosts.add(host)
+                    merged.append(source)
+            sources = merged[:5]
+
+        if not sources_meet_fact_policy(sources):
+            raise ValueError(
+                "Grounded repair could not find either one primary source or two independent reputable sources"
+            )
         repaired = apply_grounded_scene_repair(repaired, scene_number, payload, sources)
 
     total_words = int(repaired.get("narration_word_count", 0))
