@@ -1,0 +1,482 @@
+[
+  {
+    "topic": "What would happen if Earth stopped spinning for one second",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "Why neutron stars are the densest visible objects",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "The coldest known place in the universe",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "How astronauts sleep without falling down",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "The strange weather found on distant planets",
+    "niche": "space",
+    "proven": false
+  },
+  {
+    "topic": "Why space can smell like hot metal",
+    "niche": "space",
+    "proven": false
+  },
+  {
+    "topic": "How black holes bend the path of light",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "Why sunsets on Mars appear blue",
+    "niche": "space",
+    "proven": true
+  },
+  {
+    "topic": "How deep sea animals survive crushing pressure",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "Why the ocean has underwater lakes",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "The loudest animal sound in the ocean",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "How hydrothermal vents support life without sunlight",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "The mysterious daily migration beneath the ocean surface",
+    "niche": "ocean",
+    "proven": false
+  },
+  {
+    "topic": "Why some ocean waves glow blue at night",
+    "niche": "ocean",
+    "proven": false
+  },
+  {
+    "topic": "How whales communicate across huge distances",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "Why coral reefs support so many species",
+    "niche": "ocean",
+    "proven": true
+  },
+  {
+    "topic": "Animals that can survive being frozen",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "How octopuses solve complex problems",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "Why crows can remember human faces",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "The fastest biological movement in nature",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "How tiny animals navigate using Earths magnetic field",
+    "niche": "animals",
+    "proven": false
+  },
+  {
+    "topic": "The animal that can rebuild most of its body",
+    "niche": "animals",
+    "proven": false
+  },
+  {
+    "topic": "How geckos walk across ceilings",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "Why owls can fly almost silently",
+    "niche": "animals",
+    "proven": true
+  },
+  {
+    "topic": "How ancient Romans made concrete that heals itself",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "The engineering secrets of the Great Pyramid",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "How ancient cities moved water without electricity",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "The oldest known written customer complaint",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "Lost pigments used by ancient artists",
+    "niche": "ancient_history",
+    "proven": false
+  },
+  {
+    "topic": "How ancient navigators crossed oceans without maps",
+    "niche": "ancient_history",
+    "proven": false
+  },
+  {
+    "topic": "How the Inca built roads across mountains",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "Why ancient glass can survive for centuries",
+    "niche": "ancient_history",
+    "proven": true
+  },
+  {
+    "topic": "Why your stomach does not digest itself",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "How the human body repairs broken bones",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "Why fingerprints improve grip",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "What causes the feeling of pins and needles",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "How the brain predicts what you will see next",
+    "niche": "human_body",
+    "proven": false
+  },
+  {
+    "topic": "Why humans produce different kinds of tears",
+    "niche": "human_body",
+    "proven": false
+  },
+  {
+    "topic": "How your inner ear keeps you balanced",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "Why muscles shake during intense effort",
+    "niche": "human_body",
+    "proven": true
+  },
+  {
+    "topic": "Why unfinished tasks stay stuck in your mind",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "How expectation changes what food tastes like",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "Why time feels faster as routines repeat",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "How crowds change individual decisions",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "The psychology behind false familiarity",
+    "niche": "psychology",
+    "proven": false
+  },
+  {
+    "topic": "Why silence can feel longer than it is",
+    "niche": "psychology",
+    "proven": false
+  },
+  {
+    "topic": "Why choices feel harder when options multiply",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "How sleep strengthens new memories",
+    "niche": "psychology",
+    "proven": true
+  },
+  {
+    "topic": "Materials that get thicker when hit",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "How water can boil and freeze at the same time",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "Why some metals remember their original shape",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "The experiment that makes sound visible",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "How light can push microscopic objects",
+    "niche": "strange_science",
+    "proven": false
+  },
+  {
+    "topic": "Why hot water can sometimes freeze first",
+    "niche": "strange_science",
+    "proven": false
+  },
+  {
+    "topic": "How magnetic levitation can suspend objects",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "Why soap makes water spread differently",
+    "niche": "strange_science",
+    "proven": true
+  },
+  {
+    "topic": "The science behind unexplained humming sounds",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "Why some ancient maps seem unusually accurate",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "The mystery of disappearing desert lakes",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "How investigators identify unknown shipwrecks",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "The coded messages hidden in historic monuments",
+    "niche": "mysteries",
+    "proven": false
+  },
+  {
+    "topic": "Why abandoned places can preserve sound clues",
+    "niche": "mysteries",
+    "proven": false
+  },
+  {
+    "topic": "How scientists trace the origin of meteorites",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "Why some radio signals remain unidentified",
+    "niche": "mysteries",
+    "proven": true
+  },
+  {
+    "topic": "How people live in the coldest inhabited town",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "The hottest naturally occurring ground temperatures",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "Why high altitude deserts are used to test Mars equipment",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "Life beside the worlds most active volcanoes",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "The isolated caves with their own ecosystems",
+    "niche": "extreme_places",
+    "proven": false
+  },
+  {
+    "topic": "Why some deserts suddenly fill with flowers",
+    "niche": "extreme_places",
+    "proven": false
+  },
+  {
+    "topic": "How life survives beneath Antarctic ice",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "Why salt flats become giant natural mirrors",
+    "niche": "extreme_places",
+    "proven": true
+  },
+  {
+    "topic": "How quantum sensors can detect tiny changes",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "Why solid state batteries could change electric vehicles",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "How robots learn delicate hand movements",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "The technology behind reusable rockets",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "How digital twins predict machine failures",
+    "niche": "technology_future",
+    "proven": false
+  },
+  {
+    "topic": "The future of computing with light instead of electricity",
+    "niche": "technology_future",
+    "proven": false
+  },
+  {
+    "topic": "How heat pumps move more heat than their electricity input",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "Why satellite internet needs moving constellations",
+    "niche": "technology_future",
+    "proven": true
+  },
+  {
+    "topic": "Why skyscrapers are designed to sway",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "How suspension bridges survive strong winds",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "The engineering that keeps tunnels dry",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "How aircraft wings bend without breaking",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "Why some buildings use giant moving weights",
+    "niche": "engineering",
+    "proven": false
+  },
+  {
+    "topic": "How engineers move entire historic structures",
+    "niche": "engineering",
+    "proven": false
+  },
+  {
+    "topic": "How earthquake isolators protect buildings",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "Why submarine hulls use rounded shapes",
+    "niche": "engineering",
+    "proven": true
+  },
+  {
+    "topic": "How fire rainbows form without fire",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  },
+  {
+    "topic": "Why ball lightning remains difficult to explain",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  },
+  {
+    "topic": "How frost flowers grow on sea ice",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  },
+  {
+    "topic": "Why volcanic lightning appears inside ash clouds",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  },
+  {
+    "topic": "The conditions that create moonbows",
+    "niche": "rare_natural_phenomena",
+    "proven": false
+  },
+  {
+    "topic": "How singing sand dunes produce deep notes",
+    "niche": "rare_natural_phenomena",
+    "proven": false
+  },
+  {
+    "topic": "Why ice circles rotate in slow rivers",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  },
+  {
+    "topic": "How lenticular clouds form over mountains",
+    "niche": "rare_natural_phenomena",
+    "proven": true
+  }
+]

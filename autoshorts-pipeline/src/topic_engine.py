@@ -1,421 +1,367 @@
-import json
+from __future__ import annotations
+
+import argparse
+import hashlib
 import logging
-import os
 import random
-import re
-from datetime import datetime, timezone
+import tempfile
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Iterable
+from uuid import uuid4
+
+from .atomic_io import atomic_write_json, atomic_write_text, read_json
+from .models import utc_now
 
 logger = logging.getLogger(__name__)
 
-MIN_ANALYTICS_AGE_HOURS = int(os.environ.get("MIN_ANALYTICS_AGE_HOURS", "48") or 48)
-PREFERRED_ANALYTICS_AGE_HOURS = int(os.environ.get("PREFERRED_ANALYTICS_AGE_HOURS", "72") or 72)
-NICHE_REPEAT_DISTANCE = int(os.environ.get("NICHE_REPEAT_DISTANCE", "10") or 10)
-EXPLORATION_RATE = float(os.environ.get("EXPLORATION_RATE", "0.20") or 0.20)
+NICHES = (
+    "space", "ocean", "animals", "ancient_history", "human_body", "psychology",
+    "strange_science", "mysteries", "extreme_places", "technology_future",
+    "engineering", "rare_natural_phenomena",
+)
+NICHE_COOLDOWN = 8
+TOPIC_COOLDOWN = 40
+EXPLORATION_RATE = 0.20
 
-CATEGORY_KEYWORDS = {
-    "space": ["space", "planet", "galaxy", "black hole", "nasa", "moon", "mars", "asteroid", "universe", "star", "solar"],
-    "ocean": ["ocean", "sea", "deep sea", "marine", "shark", "whale", "abyss"],
-    "animals": ["animal", "animals", "wildlife", "creature", "predator", "birds", "insects", "deadliest"],
-    "history": ["history", "ancient", "civilization", "empire", "war", "king", "queen", "wonder"],
-    "psychology": ["psychology", "brain", "mind", "habit", "human behavior", "body language"],
-    "science": ["science", "physics", "quantum", "gravity", "time", "energy", "body", "rare"],
-    "mystery": ["mystery", "unsolved", "strange", "creepy", "forbidden", "lost"],
-    "places": ["places", "earth", "city", "country", "island", "desert", "mountain"],
-}
-
-# Demand-oriented seed topics. The engine exploits high-scoring niches but still rotates categories.
-TOPIC_TEMPLATES = {
+TOPIC_LIBRARY: dict[str, list[tuple[str, bool]]] = {
     "space": [
-        "3 terrifying space facts that sound fake",
-        "3 black hole facts that feel impossible",
-        "3 Mars mysteries scientists still debate",
-        "3 moon facts that will mess with your head",
-        "3 galaxy facts that make Earth feel tiny",
-        "3 asteroid facts that are genuinely scary",
-        "3 universe facts that sound unreal",
-        "3 NASA discoveries that changed space science",
-        "3 planet facts you will not forget",
-        "3 neutron star facts that sound illegal",
+        ("What would happen if Earth stopped spinning for one second", True),
+        ("Why neutron stars are the densest visible objects", True),
+        ("The coldest known place in the universe", True),
+        ("How astronauts sleep without falling down", True),
+        ("The strange weather found on distant planets", False),
+        ("Why space can smell like hot metal", False),
+        ("How black holes bend the path of light", True),
+        ("Why sunsets on Mars appear blue", True),
     ],
     "ocean": [
-        "3 deep ocean facts that sound fake",
-        "3 terrifying sea creatures you will not believe exist",
-        "3 ocean mysteries scientists still cannot explain",
-        "3 deep sea facts scarier than space",
-        "3 shark facts that are misunderstood",
-        "3 whale facts that feel impossible",
-        "3 hidden ocean places that look unreal",
-        "3 underwater discoveries that changed science",
-        "3 ocean survival facts everyone should know",
-        "3 abyss facts that feel like a nightmare",
+        ("How deep sea animals survive crushing pressure", True),
+        ("Why the ocean has underwater lakes", True),
+        ("The loudest animal sound in the ocean", True),
+        ("How hydrothermal vents support life without sunlight", True),
+        ("The mysterious daily migration beneath the ocean surface", False),
+        ("Why some ocean waves glow blue at night", False),
+        ("How whales communicate across huge distances", True),
+        ("Why coral reefs support so many species", True),
     ],
     "animals": [
-        "3 animal facts that sound fake",
-        "3 dangerous animal facts you should know",
-        "3 wildlife facts that are hard to believe",
-        "3 predator facts that feel unreal",
-        "3 insect facts that will shock you",
-        "3 bird facts that sound impossible",
-        "3 animal survival tricks that are genius",
-        "3 weird creature facts you will not forget",
-        "3 nature facts that prove animals are smarter",
-        "3 animal myths that are actually false",
+        ("Animals that can survive being frozen", True),
+        ("How octopuses solve complex problems", True),
+        ("Why crows can remember human faces", True),
+        ("The fastest biological movement in nature", True),
+        ("How tiny animals navigate using Earths magnetic field", False),
+        ("The animal that can rebuild most of its body", False),
+        ("How geckos walk across ceilings", True),
+        ("Why owls can fly almost silently", True),
     ],
-    "history": [
-        "3 history facts they never taught you",
-        "3 ancient civilization facts that sound fake",
-        "3 empire facts that changed the world",
-        "3 crazy history facts that are actually real",
-        "3 ancient mysteries still unsolved",
-        "3 war facts that changed everything",
-        "3 lost city facts that feel unreal",
-        "3 royal history facts that sound impossible",
-        "3 archaeology discoveries that shocked scientists",
-        "3 forgotten history facts worth knowing",
+    "ancient_history": [
+        ("How ancient Romans made concrete that heals itself", True),
+        ("The engineering secrets of the Great Pyramid", True),
+        ("How ancient cities moved water without electricity", True),
+        ("The oldest known written customer complaint", True),
+        ("Lost pigments used by ancient artists", False),
+        ("How ancient navigators crossed oceans without maps", False),
+        ("How the Inca built roads across mountains", True),
+        ("Why ancient glass can survive for centuries", True),
+    ],
+    "human_body": [
+        ("Why your stomach does not digest itself", True),
+        ("How the human body repairs broken bones", True),
+        ("Why fingerprints improve grip", True),
+        ("What causes the feeling of pins and needles", True),
+        ("How the brain predicts what you will see next", False),
+        ("Why humans produce different kinds of tears", False),
+        ("How your inner ear keeps you balanced", True),
+        ("Why muscles shake during intense effort", True),
     ],
     "psychology": [
-        "3 psychology facts that explain people",
-        "3 brain facts that sound fake",
-        "3 human behavior facts you can use daily",
-        "3 mind tricks your brain plays on you",
-        "3 habit facts that changed how I think",
-        "3 memory facts that feel impossible",
-        "3 social psychology facts everyone should know",
-        "3 motivation facts that actually make sense",
-        "3 decision-making facts that are scary",
-        "3 body language facts that reveal more than words",
+        ("Why unfinished tasks stay stuck in your mind", True),
+        ("How expectation changes what food tastes like", True),
+        ("Why time feels faster as routines repeat", True),
+        ("How crowds change individual decisions", True),
+        ("The psychology behind false familiarity", False),
+        ("Why silence can feel longer than it is", False),
+        ("Why choices feel harder when options multiply", True),
+        ("How sleep strengthens new memories", True),
     ],
-    "science": [
-        "3 science facts that feel impossible",
-        "3 time facts that will bend your brain",
-        "3 gravity facts that feel fake",
-        "3 quantum facts that sound unreal",
-        "3 rare body facts that sound fake",
-        "3 light facts that are hard to believe",
-        "3 physics facts that sound impossible",
-        "3 temperature facts that sound fake",
-        "3 weird science facts you will remember",
-        "3 everyday science facts that feel like magic",
+    "strange_science": [
+        ("Materials that get thicker when hit", True),
+        ("How water can boil and freeze at the same time", True),
+        ("Why some metals remember their original shape", True),
+        ("The experiment that makes sound visible", True),
+        ("How light can push microscopic objects", False),
+        ("Why hot water can sometimes freeze first", False),
+        ("How magnetic levitation can suspend objects", True),
+        ("Why soap makes water spread differently", True),
     ],
-    "mystery": [
-        "3 unsolved mysteries that still feel creepy",
-        "3 lost technologies that sound impossible",
-        "3 forbidden history facts people ignore",
-        "3 strange internet mysteries that are still unsolved",
-        "3 creepy natural phenomena caught on camera",
-        "3 mystery facts that make no sense at first",
-        "3 weird disappearances that still confuse people",
-        "3 hidden facts that feel like a movie",
-        "3 strange discoveries scientists still debate",
-        "3 facts that sound like conspiracy but are real",
+    "mysteries": [
+        ("The science behind unexplained humming sounds", True),
+        ("Why some ancient maps seem unusually accurate", True),
+        ("The mystery of disappearing desert lakes", True),
+        ("How investigators identify unknown shipwrecks", True),
+        ("The coded messages hidden in historic monuments", False),
+        ("Why abandoned places can preserve sound clues", False),
+        ("How scientists trace the origin of meteorites", True),
+        ("Why some radio signals remain unidentified", True),
     ],
-    "places": [
-        "3 places on Earth that look unreal",
-        "3 weird places you will not believe exist",
-        "3 hidden places that feel like another planet",
-        "3 dangerous places people still visit",
-        "3 natural wonders that sound fake",
-        "3 mystery locations scientists study",
-        "3 abandoned places with strange stories",
-        "3 islands with unbelievable facts",
-        "3 desert facts that feel impossible",
-        "3 Earth facts that make maps feel different",
+    "extreme_places": [
+        ("How people live in the coldest inhabited town", True),
+        ("The hottest naturally occurring ground temperatures", True),
+        ("Why high altitude deserts are used to test Mars equipment", True),
+        ("Life beside the worlds most active volcanoes", True),
+        ("The isolated caves with their own ecosystems", False),
+        ("Why some deserts suddenly fill with flowers", False),
+        ("How life survives beneath Antarctic ice", True),
+        ("Why salt flats become giant natural mirrors", True),
+    ],
+    "technology_future": [
+        ("How quantum sensors can detect tiny changes", True),
+        ("Why solid state batteries could change electric vehicles", True),
+        ("How robots learn delicate hand movements", True),
+        ("The technology behind reusable rockets", True),
+        ("How digital twins predict machine failures", False),
+        ("The future of computing with light instead of electricity", False),
+        ("How heat pumps move more heat than their electricity input", True),
+        ("Why satellite internet needs moving constellations", True),
+    ],
+    "engineering": [
+        ("Why skyscrapers are designed to sway", True),
+        ("How suspension bridges survive strong winds", True),
+        ("The engineering that keeps tunnels dry", True),
+        ("How aircraft wings bend without breaking", True),
+        ("Why some buildings use giant moving weights", False),
+        ("How engineers move entire historic structures", False),
+        ("How earthquake isolators protect buildings", True),
+        ("Why submarine hulls use rounded shapes", True),
+    ],
+    "rare_natural_phenomena": [
+        ("How fire rainbows form without fire", True),
+        ("Why ball lightning remains difficult to explain", True),
+        ("How frost flowers grow on sea ice", True),
+        ("Why volcanic lightning appears inside ash clouds", True),
+        ("The conditions that create moonbows", False),
+        ("How singing sand dunes produce deep notes", False),
+        ("Why ice circles rotate in slow rivers", True),
+        ("How lenticular clouds form over mountains", True),
     ],
 }
 
-DEFAULT_NICHE_SCORES = {
-    "space": 1.30,
-    "ocean": 1.22,
-    "animals": 1.15,
-    "history": 1.10,
-    "mystery": 1.08,
-    "science": 1.00,
-    "psychology": 0.94,
-    "places": 0.90,
+KEYWORDS = {
+    "space": ("space", "planet", "star", "universe", "astronaut", "rocket", "neutron"),
+    "ocean": ("ocean", "sea", "marine", "underwater", "hydrothermal"),
+    "animals": ("animal", "octopus", "crow", "bird", "wildlife"),
+    "ancient_history": ("ancient", "roman", "pyramid", "historic"),
+    "human_body": ("body", "stomach", "bone", "fingerprint", "tears"),
+    "psychology": ("psychology", "mind", "decision", "familiarity", "routine"),
+    "strange_science": ("science", "water", "metal", "material", "light"),
+    "mysteries": ("mystery", "unexplained", "coded", "unknown", "disappearing"),
+    "extreme_places": ("coldest", "hottest", "desert", "volcano", "cave"),
+    "technology_future": ("quantum", "battery", "robot", "technology", "computing"),
+    "engineering": ("engineering", "bridge", "skyscraper", "tunnel", "aircraft"),
+    "rare_natural_phenomena": ("rainbow", "lightning", "frost", "moonbow", "dune"),
 }
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+@dataclass(slots=True)
+class QueueReservation:
+    transaction_id: str
+    source: str
+    topic: str
+    niche: str
+    reserved_at: str
+    status: str = "reserved"
+    replacement_topic: str = ""
+    replacement_niche: str = ""
 
 
-def _json_load(path: str, default):
-    p = Path(path)
-    if not p.exists():
-        return default
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception as exc:
-        logger.warning(f"Could not read {path}: {exc}")
-        return default
+class QueueManager:
+    def __init__(self, base_dir: str | Path = ".", queue_name: str = "topics.txt") -> None:
+        self.base = Path(base_dir)
+        self.queue_path = self.base / queue_name
+        self.state_path = self.base / "topic_state.json"
+        self.bank_path = self.base / "topic_bank.json"
+        self.tx_path = self.base / "queue_transaction.json"
+        self.base.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def categorize(topic: str) -> str:
+        normalized_topic = topic.strip().casefold()
+        for niche, rows in TOPIC_LIBRARY.items():
+            if any(candidate.casefold() == normalized_topic for candidate, _ in rows):
+                return niche
+        text = topic.lower()
+        scores = {n: sum(1 for key in KEYWORDS[n] if key in text) for n in NICHES}
+        best = max(scores, key=scores.get)
+        return best if scores[best] else "strange_science"
 
-def _json_save(path: str, data) -> None:
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    def read_queue(self) -> list[str]:
+        if not self.queue_path.exists():
+            return []
+        return [line.strip() for line in self.queue_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def _write_queue(self, topics: Iterable[str]) -> None:
+        atomic_write_text(self.queue_path, "\n".join(topics) + "\n")
 
-def clean_topic_line(line: str) -> str:
-    return re.sub(r"\s+", " ", str(line or "").strip(" \t\n\r-•*0123456789.()[]"))
+    def reserve(self, manual_topic: str | None = None) -> QueueReservation:
+        if manual_topic and manual_topic.strip():
+            topic = manual_topic.strip()
+            reservation = QueueReservation(uuid4().hex, "manual", topic, self.categorize(topic), utc_now())
+            logger.info("Manual topic mode; queue will not be changed: %s", topic)
+            return reservation
+        queue = self.read_queue()
+        if not queue:
+            raise RuntimeError(f"Topic queue is empty: {self.queue_path}")
+        topic = queue[0]
+        reservation = QueueReservation(uuid4().hex, "queue", topic, self.categorize(topic), utc_now())
+        atomic_write_json(self.tx_path, asdict(reservation))
+        logger.info("QUEUE BEFORE: %s", queue)
+        logger.info("RESERVED TOPIC: %s", topic)
+        logger.info("RESERVED NICHE: %s", reservation.niche)
+        return reservation
 
+    def _all_candidates(self, proven: bool | None = None) -> list[tuple[str, str, bool]]:
+        rows: list[tuple[str, str, bool]] = []
+        for niche, topics in TOPIC_LIBRARY.items():
+            for topic, is_proven in topics:
+                if proven is None or is_proven == proven:
+                    rows.append((topic, niche, is_proven))
+        return rows
 
-def categorize_topic(topic: str) -> str:
-    low = str(topic or "").lower()
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        if any(k in low for k in keywords):
-            return category
-    return "mystery"
+    def _choose_replacement(self, reservation: QueueReservation, queue_after_pop: list[str], state: dict) -> tuple[str, str]:
+        # The replacement is appended to the queue tail, so compare its niche with
+        # the eight topics that will immediately precede it when it is selected.
+        tail_niches = [self.categorize(topic) for topic in queue_after_pop[-NICHE_COOLDOWN:]]
+        generated_niches = list(state.get("recent_replacement_niches", []))[-NICHE_COOLDOWN:]
+        recent_topics = list(state.get("used_topics", []))[-TOPIC_COOLDOWN:]
+        seed = int(hashlib.sha256(reservation.transaction_id.encode()).hexdigest()[:16], 16)
+        rng = random.Random(seed)
+        exploratory = rng.random() < EXPLORATION_RATE
+        candidates = self._all_candidates(proven=not exploratory)
+        rng.shuffle(candidates)
 
+        def allowed(row: tuple[str, str, bool], *, enforce_tail: bool, enforce_generated: bool = True) -> bool:
+            topic, niche, _ = row
+            return (
+                topic != reservation.topic
+                and topic not in queue_after_pop
+                and topic not in recent_topics
+                and (not enforce_tail or niche not in tail_niches)
+                and (not enforce_generated or niche not in generated_niches)
+            )
 
-def read_topics(topics_file: str) -> List[str]:
-    if not os.path.exists(topics_file):
-        raise FileNotFoundError(f"Topics file not found: {topics_file}")
-    topics = [clean_topic_line(line) for line in Path(topics_file).read_text(encoding="utf-8").splitlines()]
-    return [t for t in topics if t]
+        # Keep the generated replacement sequence diverse even when the existing
+        # queue tail makes the stricter condition temporarily impossible.
+        for enforce_tail in (True, False):
+            for row in candidates:
+                if allowed(row, enforce_tail=enforce_tail):
+                    return row[0], row[1]
+        for row in candidates:
+            if allowed(row, enforce_tail=False, enforce_generated=False):
+                return row[0], row[1]
+        for row in self._all_candidates(None):
+            if row[0] not in queue_after_pop and row[0] != reservation.topic:
+                return row[0], row[1]
+        raise RuntimeError("No unique replacement topic is available")
 
+    def finalize(self, reservation: QueueReservation, success: bool) -> dict:
+        if reservation.source == "manual":
+            return {"status": "not_applicable", "source": "manual", "queue_changed": False}
+        existing = read_json(self.tx_path, {})
+        if existing.get("transaction_id") == reservation.transaction_id and existing.get("status") == "finalized":
+            logger.info("Queue transaction already finalized; leaving queue unchanged.")
+            return existing
+        if not success:
+            failed = asdict(reservation)
+            failed.update({"status": "failed", "failed_at": utc_now(), "queue_changed": False})
+            atomic_write_json(self.tx_path, failed)
+            logger.info("Pipeline failed; queue remains unchanged.")
+            return failed
 
-def write_topics(topics_file: str, topics: List[str]) -> None:
-    seen = set()
-    clean = []
-    for t in topics:
-        t = clean_topic_line(t)
-        key = t.lower()
-        if t and key not in seen:
-            clean.append(t)
-            seen.add(key)
-    Path(topics_file).write_text("\n".join(clean) + "\n", encoding="utf-8")
+        queue = self.read_queue()
+        if not queue or queue[0] != reservation.topic:
+            raise RuntimeError("Queue head changed after reservation; refusing non-atomic finalization")
+        state = read_json(self.state_path, {"recent_niches": [], "used_topics": [], "events": []})
+        queue_after = queue[1:]
+        replacement, niche = self._choose_replacement(reservation, queue_after, state)
+        queue_after.append(replacement)
 
-
-def _parse_dt(value: str) -> Optional[datetime]:
-    try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except Exception:
-        return None
-
-
-def update_niche_scores_from_history() -> Dict[str, Dict]:
-    history = _json_load("analytics_history.json", [])
-    matured = []
-    now = datetime.now(timezone.utc)
-    for item in history:
-        published_at = _parse_dt(item.get("published_at"))
-        if not published_at:
-            continue
-        age_hours = (now - published_at).total_seconds() / 3600.0
-        if age_hours >= MIN_ANALYTICS_AGE_HOURS:
-            matured.append(item)
-
-    grouped: Dict[str, List[Dict]] = {}
-    for item in matured:
-        niche = item.get("niche") or categorize_topic(item.get("topic") or item.get("title") or "")
-        grouped.setdefault(niche, []).append(item)
-
-    scores = {}
-    for niche in TOPIC_TEMPLATES:
-        rows = grouped.get(niche, [])[-20:]
-        if rows:
-            views = [float(r.get("views") or 0) for r in rows]
-            likes = [float(r.get("likes") or 0) for r in rows]
-            avg_views = sum(views) / len(views)
-            like_rate = (sum(likes) / max(1.0, sum(views))) if views else 0.0
-            score = avg_views * (1.0 + min(like_rate * 8.0, 0.7))
-        else:
-            avg_views = 0.0
-            like_rate = 0.0
-            score = DEFAULT_NICHE_SCORES.get(niche, 0.8)
-        scores[niche] = {
-            "niche": niche,
-            "recent_avg_views": round(avg_views, 2),
-            "recent_avg_like_rate": round(like_rate, 4),
-            "sample_size": len(rows),
-            "score": round(score, 4),
-            "updated_at": now_iso(),
-            "min_analytics_age_hours": MIN_ANALYTICS_AGE_HOURS,
+        state.setdefault("recent_niches", []).append(reservation.niche)
+        state["recent_niches"] = state["recent_niches"][-NICHE_COOLDOWN:]
+        state.setdefault("used_topics", []).append(reservation.topic)
+        state["used_topics"] = state["used_topics"][-TOPIC_COOLDOWN:]
+        state.setdefault("recent_replacement_niches", []).append(niche)
+        state["recent_replacement_niches"] = state["recent_replacement_niches"][-NICHE_COOLDOWN:]
+        event = {
+            "transaction_id": reservation.transaction_id,
+            "selected_topic": reservation.topic,
+            "selected_niche": reservation.niche,
+            "replacement_topic": replacement,
+            "replacement_niche": niche,
+            "finalized_at": utc_now(),
         }
-    _json_save("niche_scores.json", scores)
-    return scores
+        state.setdefault("events", []).append(event)
+        state["events"] = state["events"][-200:]
+        bank = read_json(self.bank_path, [])
+        known = {row.get("topic") for row in bank if isinstance(row, dict)}
+        for topic, topic_niche, proven in self._all_candidates(None):
+            if topic not in known:
+                bank.append({"topic": topic, "niche": topic_niche, "proven": proven})
 
-
-def _recent_niches() -> List[str]:
-    state = _json_load("topic_state.json", {"recent_niches": [], "used_topics": []})
-    return list(state.get("recent_niches", []))[-NICHE_REPEAT_DISTANCE:]
-
-
-def _select_niche(selected_topic: str) -> Tuple[str, str]:
-    scores = update_niche_scores_from_history()
-    recent = _recent_niches()
-    exploration = random.random() < EXPLORATION_RATE
-    if exploration:
-        candidates = [n for n in TOPIC_TEMPLATES if n not in recent] or list(TOPIC_TEMPLATES)
-        return random.choice(candidates), "exploration"
-
-    ranked = sorted(scores.values(), key=lambda x: x.get("score", 0), reverse=True)
-    for row in ranked:
-        niche = row["niche"]
-        if niche not in recent:
-            return niche, "analytics_exploitation"
-    # If every niche appears in the recent window, use the selected topic's niche as a safe fallback.
-    return categorize_topic(selected_topic), "repeat_distance_fallback"
-
-
-def _pick_topic_from_niche(niche: str, existing_topics: List[str], selected_topic: str) -> str:
-    templates = TOPIC_TEMPLATES.get(niche) or TOPIC_TEMPLATES["mystery"]
-    existing = {t.lower().strip() for t in existing_topics}
-    used_state = _json_load("topic_state.json", {"used_topics": []})
-    recently_used = {t.lower().strip() for t in used_state.get("used_topics", [])[-40:]}
-    start = abs(hash(selected_topic + niche + now_iso()[:10])) % len(templates)
-    for offset in range(len(templates)):
-        candidate = templates[(start + offset) % len(templates)]
-        ck = candidate.lower().strip()
-        if ck not in existing and ck not in recently_used and ck != selected_topic.lower().strip():
-            return candidate
-    for candidate in templates:
-        ck = candidate.lower().strip()
-        if ck not in existing and ck != selected_topic.lower().strip():
-            return candidate
-    return f"3 {niche} facts that sound unreal {random.randint(100,999)}"
-
-
-def _record_topic_bank(topic: str, source: str = "queue", status: str = "active") -> None:
-    bank = _json_load("topic_bank.json", [])
-    key = topic.lower().strip()
-    found = False
-    for row in bank:
-        if row.get("topic", "").lower().strip() == key:
-            row["last_seen_at"] = now_iso()
-            row["times_used"] = int(row.get("times_used", 0)) + (1 if source == "used" else 0)
-            row["status"] = status or row.get("status", "active")
-            found = True
-            break
-    if not found:
-        bank.append({
-            "topic": topic,
-            "niche": categorize_topic(topic),
-            "angle": "facts/reveals",
-            "created_at": now_iso(),
-            "last_seen_at": now_iso(),
-            "source": source,
-            "status": status,
-            "times_used": 1 if source == "used" else 0,
+        finalized = asdict(reservation)
+        finalized.update({
+            "status": "finalized", "finalized_at": utc_now(), "queue_changed": True,
+            "replacement_topic": replacement, "replacement_niche": niche,
+            "queue_before": queue, "queue_after": queue_after,
         })
-    _json_save("topic_bank.json", bank[-500:])
+        self._write_queue(queue_after)
+        atomic_write_json(self.state_path, state)
+        atomic_write_json(self.bank_path, bank)
+        atomic_write_json(self.tx_path, finalized)
+        logger.info("RECENT NICHES: %s", state["recent_niches"])
+        logger.info("REPLACEMENT TOPIC: %s", replacement)
+        logger.info("REPLACEMENT NICHE: %s", niche)
+        logger.info("QUEUE AFTER: %s", queue_after)
+        logger.info("QUEUE COMMIT STATUS: finalized locally")
+        return finalized
 
 
-def _update_topic_state(selected: str, replacement: str, replacement_niche: str, mode: str) -> None:
-    state = _json_load("topic_state.json", {"recent_niches": [], "used_topics": [], "events": []})
-    selected_niche = categorize_topic(selected)
-    state.setdefault("recent_niches", []).append(selected_niche)
-    state["recent_niches"] = state["recent_niches"][-NICHE_REPEAT_DISTANCE:]
-    state.setdefault("used_topics", []).append(selected)
-    state["used_topics"] = state["used_topics"][-80:]
-    state.setdefault("events", []).append({
-        "at": now_iso(),
-        "selected_topic": selected,
-        "selected_niche": selected_niche,
-        "replacement_topic": replacement,
-        "replacement_niche": replacement_niche,
-        "mode": mode,
-    })
-    state["events"] = state["events"][-200:]
-    _json_save("topic_state.json", state)
+def self_test() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        manager = QueueManager(tmp)
+        initial = [TOPIC_LIBRARY[niche][round_index][0] for round_index in range(2) for niche in NICHES]
+        manager._write_queue(initial)
+        atomic_write_json(manager.state_path, {"recent_niches": [], "used_topics": [], "events": []})
+        previous_len = len(initial)
+        for _ in range(50):
+            before = manager.read_queue()
+            reservation = manager.reserve()
+            result = manager.finalize(reservation, True)
+            after = manager.read_queue()
+            assert result["status"] == "finalized"
+            assert len(after) == previous_len
+            assert before[1:] == after[:-1]
+            assert len(after) == len(set(after))
+            again = manager.finalize(reservation, True)
+            assert again["status"] == "finalized"
+            assert manager.read_queue() == after
+        before = manager.read_queue()
+        manual = manager.reserve("A manual test topic")
+        manager.finalize(manual, True)
+        assert manager.read_queue() == before
+        failed = manager.reserve()
+        manager.finalize(failed, False)
+        assert manager.read_queue() == before
+    print("topic_engine self-test passed: 50 rotations, rollback, manual mode, idempotency")
 
 
-def pop_topic_and_refresh_queue(topics_file: str) -> str:
-    # Best-effort analytics sync. It never blocks video generation.
-    try:
-        if os.environ.get("ENABLE_ANALYTICS_SYNC", "true").lower() in {"1", "true", "yes"}:
-            sync_analytics_if_possible()
-    except Exception as exc:
-        logger.warning(f"Analytics sync skipped: {exc}")
-
-    topics = read_topics(topics_file)
-    if not topics:
-        raise RuntimeError(f"No topics found in {topics_file}")
-
-    selected = topics.pop(0)
-    replacement_niche, mode = _select_niche(selected)
-    replacement = _pick_topic_from_niche(replacement_niche, topics, selected)
-    topics.append(replacement)
-    write_topics(topics_file, topics)
-
-    _record_topic_bank(selected, source="used", status="active")
-    _record_topic_bank(replacement, source=mode, status=("exploration" if mode == "exploration" else "active"))
-    _update_topic_state(selected, replacement, replacement_niche, mode)
-
-    logger.info(f"Popped topic from queue: '{selected}'")
-    logger.info(f"Appended replacement topic: '{replacement}' [{replacement_niche}, {mode}]")
-    return selected
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--self-test", action="store_true")
+    args = parser.parse_args()
+    if args.self_test:
+        self_test()
 
 
-def record_uploaded_video(video_url: str, title: str, topic: str) -> None:
-    video_id = str(video_url).rstrip("/").split("/")[-1]
-    history = _json_load("upload_history.json", [])
-    history.append({
-        "video_id": video_id,
-        "url": video_url,
-        "title": title,
-        "topic": topic,
-        "niche": categorize_topic(topic),
-        "published_at": now_iso(),
-        "analytics_mature_after": datetime.now(timezone.utc).timestamp() + MIN_ANALYTICS_AGE_HOURS * 3600,
-    })
-    _json_save("upload_history.json", history[-1000:])
-
-
-def sync_analytics_if_possible() -> None:
-    """Best-effort YouTube Data API stats sync. Never raises to callers."""
-    uploads = _json_load("upload_history.json", [])
-    if not uploads:
-        update_niche_scores_from_history()
-        return
-
-    now = datetime.now(timezone.utc)
-    matured_uploads = []
-    for row in uploads:
-        published = _parse_dt(row.get("published_at"))
-        if published and (now - published).total_seconds() / 3600.0 >= MIN_ANALYTICS_AGE_HOURS:
-            matured_uploads.append(row)
-    if not matured_uploads:
-        logger.info(f"No videos older than {MIN_ANALYTICS_AGE_HOURS}h yet; analytics scoring unchanged.")
-        update_niche_scores_from_history()
-        return
-
-    ids = [r.get("video_id") for r in matured_uploads if r.get("video_id")]
-    if not ids:
-        update_niche_scores_from_history()
-        return
-
-    try:
-        from src.uploader import get_authenticated_service
-        youtube = get_authenticated_service()
-        existing = _json_load("analytics_history.json", [])
-        by_id = {row.get("video_id"): row for row in existing if row.get("video_id")}
-        for i in range(0, len(ids), 50):
-            batch = ids[i:i+50]
-            resp = youtube.videos().list(part="statistics,snippet,contentDetails", id=",".join(batch)).execute()
-            upload_map = {r.get("video_id"): r for r in matured_uploads}
-            for item in resp.get("items", []):
-                vid = item.get("id")
-                stats = item.get("statistics", {})
-                base = upload_map.get(vid, {})
-                by_id[vid] = {
-                    "video_id": vid,
-                    "title": base.get("title") or item.get("snippet", {}).get("title"),
-                    "topic": base.get("topic") or item.get("snippet", {}).get("title"),
-                    "niche": base.get("niche") or categorize_topic(base.get("topic") or item.get("snippet", {}).get("title")),
-                    "published_at": base.get("published_at") or item.get("snippet", {}).get("publishedAt"),
-                    "views": int(stats.get("viewCount", 0) or 0),
-                    "likes": int(stats.get("likeCount", 0) or 0),
-                    "comments": int(stats.get("commentCount", 0) or 0),
-                    "pulled_at": now_iso(),
-                    "source": "youtube_data_api",
-                }
-        _json_save("analytics_history.json", list(by_id.values())[-1000:])
-        update_niche_scores_from_history()
-        logger.info("Analytics sync completed.")
-    except Exception as exc:
-        logger.warning(f"YouTube analytics sync failed; using existing local scores only: {exc}")
-        update_niche_scores_from_history()
+if __name__ == "__main__":
+    main()

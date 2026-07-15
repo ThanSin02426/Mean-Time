@@ -1,0 +1,16 @@
+.DS_Store
+.env
+*.env
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+autoshorts-pipeline/.work/
+autoshorts-pipeline/output/
+autoshorts-pipeline/assets/music/*.mp3
+autoshorts-pipeline/assets/music/*.wav
+autoshorts-pipeline/assets/music/*.m4a
+!autoshorts-pipeline/assets/music/music_library.json

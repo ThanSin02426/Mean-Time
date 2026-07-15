@@ -1,354 +1,328 @@
-import os
-import time
-import random
-import requests
-import urllib.parse
+from __future__ import annotations
+
+import hashlib
 import logging
-import textwrap
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import os
+import re
+import subprocess
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+import requests
+from PIL import Image, ImageDraw
+
+from .atomic_io import atomic_write_json, read_json
+from .audio_utils import ffprobe
 
 logger = logging.getLogger(__name__)
 
-W, H = 1080, 1920
 
-THEMES = [
-    {"top": (8, 12, 28), "bottom": (28, 6, 42), "accent": (255, 214, 80), "icon": "planet"},
-    {"top": (5, 18, 30), "bottom": (7, 45, 60), "accent": (91, 214, 255), "icon": "mystery"},
-    {"top": (22, 8, 18), "bottom": (55, 12, 28), "accent": (255, 96, 128), "icon": "warning"},
-    {"top": (7, 20, 14), "bottom": (12, 46, 28), "accent": (142, 255, 167), "icon": "diamond"},
-]
+@dataclass(slots=True)
+class VisualCandidate:
+    provider: str
+    candidate_id: str
+    media_type: str
+    url: str
+    preview_url: str
+    title: str
+    tags: list[str]
+    width: int
+    height: int
+    author: str
+    source_url: str
+    score: float = 0.0
+    rejected_reason: str = ""
 
 
-def _font(size: int, bold: bool = True):
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
-        "Arial Bold.ttf" if bold else "Arial.ttf",
-    ]
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:
+def _tokens(value: str | list[str]) -> set[str]:
+    if isinstance(value, list):
+        value = " ".join(value)
+    return set(re.findall(r"[a-z0-9]+", str(value).lower()))
+
+
+def score_candidate(candidate: dict[str, Any] | VisualCandidate, keywords: list[str], negative_terms: list[str], used_ids: set[str] | None = None) -> float:
+    data = asdict(candidate) if isinstance(candidate, VisualCandidate) else candidate
+    if used_ids and str(data.get("candidate_id")) in used_ids:
+        return -100.0
+    haystack = _tokens([str(data.get("title", "")), " ".join(data.get("tags", []) or [])])
+    wanted = _tokens(keywords)
+    negatives = _tokens(negative_terms)
+    exact = len(haystack & wanted)
+    negative_hits = len(haystack & negatives)
+    width = int(data.get("width", 0) or 0)
+    height = int(data.get("height", 0) or 0)
+    orientation_bonus = 1.5 if height >= width and height >= 720 else 0.0
+    resolution_bonus = 1.0 if max(width, height) >= 1080 else 0.0
+    media_bonus = 0.4 if data.get("media_type") == "video" else 0.0
+    return round(exact * 2.5 + orientation_bonus + resolution_bonus + media_bonus - negative_hits * 5.0, 3)
+
+
+def _pexels_candidates(query: str) -> list[VisualCandidate]:
+    key = os.getenv("PEXELS_API_KEY", "").strip()
+    if not key:
+        return []
+    headers = {"Authorization": key}
+    candidates: list[VisualCandidate] = []
+    response = requests.get(
+        f"https://api.pexels.com/videos/search?query={quote(query)}&orientation=portrait&per_page=12",
+        headers=headers, timeout=20,
+    )
+    if response.ok:
+        for video in response.json().get("videos", []):
+            files = [row for row in video.get("video_files", []) if row.get("link") and int(row.get("height", 0) or 0) >= 720]
+            if not files:
+                continue
+            best = sorted(files, key=lambda row: (int(row.get("height", 0) or 0), int(row.get("width", 0) or 0)), reverse=True)[0]
+            page_url = str(video.get("url", ""))
+            slug = page_url.rstrip("/").split("/")[-1].replace("-", " ")
+            candidates.append(VisualCandidate(
+                "pexels", str(video.get("id")), "video", best["link"], video.get("image", ""),
+                slug, list(_tokens(slug)), int(best.get("width", 0)), int(best.get("height", 0)),
+                video.get("user", {}).get("name", ""), page_url,
+            ))
+    response = requests.get(
+        f"https://api.pexels.com/v1/search?query={quote(query)}&orientation=portrait&per_page=12",
+        headers=headers, timeout=20,
+    )
+    if response.ok:
+        for photo in response.json().get("photos", []):
+            candidates.append(VisualCandidate(
+                "pexels", str(photo.get("id")), "image", photo.get("src", {}).get("large2x", ""), photo.get("src", {}).get("medium", ""),
+                str(photo.get("alt", "")), list(_tokens(str(photo.get("alt", "")))), int(photo.get("width", 0)), int(photo.get("height", 0)),
+                photo.get("photographer", ""), photo.get("url", ""),
+            ))
+    return candidates
+
+
+def _pixabay_candidates(query: str) -> list[VisualCandidate]:
+    key = os.getenv("PIXABAY_API_KEY", "").strip()
+    if not key:
+        return []
+    candidates: list[VisualCandidate] = []
+    response = requests.get(f"https://pixabay.com/api/videos/?key={key}&q={quote(query)}&safesearch=true&per_page=12", timeout=20)
+    if response.ok:
+        for hit in response.json().get("hits", []):
+            files = hit.get("videos", {})
+            chosen = files.get("large") or files.get("medium") or files.get("small") or {}
+            if not chosen.get("url"):
+                continue
+            candidates.append(VisualCandidate(
+                "pixabay", str(hit.get("id")), "video", chosen["url"], hit.get("picture_id", ""),
+                hit.get("tags", query), [tag.strip() for tag in str(hit.get("tags", "")).split(",")],
+                int(chosen.get("width", 0)), int(chosen.get("height", 0)), hit.get("user", ""), hit.get("pageURL", ""),
+            ))
+    response = requests.get(f"https://pixabay.com/api/?key={key}&q={quote(query)}&image_type=photo&safesearch=true&per_page=12", timeout=20)
+    if response.ok:
+        for hit in response.json().get("hits", []):
+            candidates.append(VisualCandidate(
+                "pixabay", str(hit.get("id")), "image", hit.get("largeImageURL", ""), hit.get("previewURL", ""),
+                hit.get("tags", query), [tag.strip() for tag in str(hit.get("tags", "")).split(",")],
+                int(hit.get("imageWidth", 0)), int(hit.get("imageHeight", 0)), hit.get("user", ""), hit.get("pageURL", ""),
+            ))
+    return candidates
+
+
+def _nasa_candidates(query: str) -> list[VisualCandidate]:
+    candidates: list[VisualCandidate] = []
+    response = requests.get(f"https://images-api.nasa.gov/search?q={quote(query)}&media_type=image&page_size=20", timeout=20)
+    if not response.ok:
+        return candidates
+    for item in response.json().get("collection", {}).get("items", []):
+        data = (item.get("data") or [{}])[0]
+        links = item.get("links") or []
+        media_type = "image"
+        preview = next((row.get("href") for row in links if row.get("href")), "")
+        if not preview:
             continue
-    return ImageFont.load_default()
+        candidates.append(VisualCandidate(
+            "nasa", str(data.get("nasa_id", preview)), media_type, preview, preview,
+            data.get("title", query), data.get("keywords", []) or [query], 1200, 1200,
+            data.get("center", "NASA"), f"https://images.nasa.gov/details/{data.get('nasa_id', '')}",
+        ))
+    return candidates
 
 
-def _pick_icon(text: str, default: str = "mystery") -> str:
-    low = text.lower()
-    if any(k in low for k in ["space", "planet", "galaxy", "moon", "mars", "star", "nasa", "universe"]):
-        return "planet"
-    if any(k in low for k in ["danger", "terrifying", "scary", "warning"]):
-        return "warning"
-    if any(k in low for k in ["diamond", "rare", "valuable"]):
-        return "diamond"
-    return default
+def _download(url: str, path: Path, max_bytes: int = 80 * 1024 * 1024) -> None:
+    downloaded = 0
+    with requests.get(url, stream=True, timeout=45, headers={"User-Agent": "AutoShorts/2.0"}) as response:
+        response.raise_for_status()
+        declared = int(response.headers.get("content-length", 0) or 0)
+        if declared and declared > max_bytes:
+            raise RuntimeError(f"Media file is too large: {declared} bytes")
+        with path.open("wb") as handle:
+            for chunk in response.iter_content(1024 * 256):
+                if not chunk:
+                    continue
+                downloaded += len(chunk)
+                if downloaded > max_bytes:
+                    raise RuntimeError("Media download exceeded the size limit")
+                handle.write(chunk)
 
 
-def _draw_vector_icon(draw, cx, cy, kind, accent):
-    """Draw simple icons with PIL shapes only. No emoji fonts, no missing glyph boxes."""
-    if kind == "planet":
-        draw.ellipse((cx - 105, cy - 105, cx + 105, cy + 105), fill=(18, 26, 52, 245), outline=accent, width=8)
-        draw.arc((cx - 155, cy - 62, cx + 155, cy + 62), start=8, end=172, fill=(255, 255, 255, 210), width=10)
-        draw.arc((cx - 155, cy - 62, cx + 155, cy + 62), start=188, end=352, fill=accent, width=10)
-        draw.ellipse((cx - 40, cy - 35, cx - 10, cy - 5), fill=accent)
-        draw.ellipse((cx + 34, cy + 24, cx + 64, cy + 54), fill=(255, 255, 255, 200))
-    elif kind == "warning":
-        pts = [(cx, cy - 125), (cx - 125, cy + 105), (cx + 125, cy + 105)]
-        draw.polygon(pts, fill=(28, 14, 20, 240), outline=accent)
-        draw.line((cx, cy - 42, cx, cy + 36), fill=accent, width=18)
-        draw.ellipse((cx - 10, cy + 62, cx + 10, cy + 82), fill=accent)
-    elif kind == "diamond":
-        pts = [(cx, cy - 135), (cx + 120, cy - 25), (cx + 72, cy + 125), (cx, cy + 155), (cx - 72, cy + 125), (cx - 120, cy - 25)]
-        draw.polygon(pts, fill=(14, 32, 42, 240), outline=accent)
-        draw.line((cx, cy - 135, cx, cy + 155), fill=(255, 255, 255, 145), width=5)
-        draw.line((cx - 120, cy - 25, cx + 120, cy - 25), fill=(255, 255, 255, 145), width=5)
-    else:
-        font = _font(210, True)
-        draw.text((cx, cy), "?", font=font, fill=accent, anchor="mm", stroke_width=7, stroke_fill=(0, 0, 0, 180))
-
-
-def _shorten(text: str, max_words: int) -> str:
-    words = [w.strip() for w in text.replace("\n", " ").split() if w.strip()]
-    return " ".join(words[:max_words])
-
-
-def _wrap_to_width(text: str, font, max_width: int, max_lines: int):
-    words = text.split()
-    lines, current = [], ""
-    dummy = Image.new("RGB", (10, 10))
-    draw = ImageDraw.Draw(dummy)
-    for word in words:
-        trial = f"{current} {word}".strip()
-        bbox = draw.textbbox((0, 0), trial, font=font)
-        if bbox[2] - bbox[0] <= max_width:
-            current = trial
-        else:
-            if current:
-                lines.append(current)
-            current = word
-        if len(lines) >= max_lines:
-            break
-    if current and len(lines) < max_lines:
-        lines.append(current)
-    if len(lines) == max_lines and len(" ".join(words)) > len(" ".join(lines)):
-        lines[-1] = lines[-1].rstrip(".,;:") + "…"
-    return lines
-
-
-def _gradient_background(width=W, height=H, theme=None):
-    theme = theme or random.choice(THEMES)
-    img = Image.new("RGB", (width, height))
-    draw = ImageDraw.Draw(img)
-    top, bottom = theme["top"], theme["bottom"]
-    for y in range(height):
-        ratio = y / float(height - 1)
-        r = int(top[0] * (1 - ratio) + bottom[0] * ratio)
-        g = int(top[1] * (1 - ratio) + bottom[1] * ratio)
-        b = int(top[2] * (1 - ratio) + bottom[2] * ratio)
-        draw.line([(0, y), (width, y)], fill=(r, g, b))
-
-    # soft radial glow
-    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    accent = theme["accent"]
-    for radius, alpha in [(520, 30), (360, 45), (220, 60)]:
-        x, y = width // 2, int(height * 0.36)
-        od.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(*accent, alpha))
-    img = Image.alpha_composite(img.convert("RGBA"), overlay)
-
-    # particles/stars
-    draw = ImageDraw.Draw(img)
-    random.seed(42)
-    for _ in range(170):
-        x = random.randint(30, width - 30)
-        y = random.randint(40, height - 40)
-        size = random.choice([1, 1, 2, 2, 3])
-        alpha = random.randint(45, 150)
-        draw.ellipse((x, y, x + size, y + size), fill=(255, 255, 255, alpha))
-
-    return img
-
-
-def create_local_fallback_image(text, output_path, width=W, height=H, scene_index=0, is_final=False):
-    """Create a complete designed 9:16 slide that looks intentional, not like an error fallback."""
-    logger.info(f"Creating designed local slide at {output_path}...")
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-
-    theme = THEMES[scene_index % len(THEMES)]
-    img = _gradient_background(width, height, theme)
-    draw = ImageDraw.Draw(img)
-
-    accent = theme["accent"]
-    icon = _pick_icon(text, theme.get("icon", "mystery"))
-
-    clean = " ".join(str(text or "").replace("\n", " ").split())
-    headline = _shorten(clean, 5).upper() or "WATCH THIS"
-    support = _shorten(clean, 11)
-    if support.lower().startswith(headline.lower()) or support.lower() == headline.lower():
-        support = "This sounds fake, but it is real."
-
-    headline_font = _font(108, True)
-    support_font = _font(48, False)
-    pill_font = _font(36, True)
-    cta_font = _font(34, True)
-
-    safe_x = 86
-    max_text_width = width - safe_x * 2
-
-    # Top pill label.
-    pill_text = "FINAL REVEAL" if is_final else (f"FACT {scene_index + 1}" if scene_index else "WATCH THIS")
-    pill_bbox = draw.textbbox((0, 0), pill_text, font=pill_font)
-    pill_w = pill_bbox[2] - pill_bbox[0] + 64
-    pill_h = 74
-    pill_x = (width - pill_w) // 2
-    pill_y = 154
-    draw.rounded_rectangle((pill_x, pill_y, pill_x + pill_w, pill_y + pill_h), radius=36, fill=(*accent, 230))
-    draw.text((width // 2, pill_y + pill_h // 2), pill_text, font=pill_font, fill=(10, 10, 15), anchor="mm")
-
-    # Vector icon. No emoji text is used anywhere.
-    _draw_vector_icon(draw, width // 2, 410, icon, accent)
-
-    # Headline block.
-    headline_lines = _wrap_to_width(headline, headline_font, max_text_width, 3)
-    y = 700
-    for line in headline_lines:
-        draw.text((width // 2 + 4, y + 6), line, font=headline_font, fill=(0, 0, 0, 185), anchor="mm")
-        draw.text((width // 2, y), line, font=headline_font, fill=(255, 255, 255, 255), anchor="mm", stroke_width=4, stroke_fill=(0, 0, 0, 210))
-        y += 118
-
-    draw.rounded_rectangle((width // 2 - 190, y + 8, width // 2 + 190, y + 24), radius=8, fill=(*accent, 245))
-
-    # Support card stays above caption-safe lower third.
-    card_y = 1120
-    card_h = 210
-    draw.rounded_rectangle((72, card_y, width - 72, card_y + card_h), radius=46, fill=(0, 0, 0, 145), outline=(*accent, 160), width=3)
-    support_lines = _wrap_to_width(support, support_font, max_text_width - 90, 2)
-    sy = card_y + 78
-    for line in support_lines:
-        draw.text((width // 2, sy), line, font=support_font, fill=(235, 240, 255, 255), anchor="mm")
-        sy += 62
-
-    # Only final scene may show CTA; bottom region otherwise reserved for dynamic captions.
-    if is_final:
-        draw.text((width // 2, height - 205), "FOLLOW FOR MORE", font=cta_font, fill=(*accent, 230), anchor="mm")
-
-    img.convert("RGB").save(output_path, quality=95)
-    return output_path
-
-
-def search_pexels(query):
-    api_key = os.environ.get("PEXELS_API_KEY")
-    if not api_key:
-        return None
-
-    headers = {"Authorization": api_key}
-
-    # Try video first
+def _valid_media(path: Path, media_type: str) -> bool:
     try:
-        url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=5"
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("videos"):
-                video = random.choice(data["videos"])
-                video_files = video.get("video_files", [])
-                # Filter for HD vertical
-                hd_files = [f for f in video_files if f.get("width", 0) >= 720 and f.get("link")]
-                if hd_files:
-                    best_file = sorted(hd_files, key=lambda x: x.get("width", 0), reverse=True)[0]
-                    return {"url": best_file["link"], "type": "video", "source": "pexels", "author": video.get("user", {}).get("name")}
-    except Exception as e:
-        logger.warning(f"Pexels video search failed: {e}")
-
-    # Try photo
-    try:
-        url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=5"
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("photos"):
-                photo = random.choice(data["photos"])
-                return {"url": photo["src"]["large2x"], "type": "image", "source": "pexels", "author": photo.get("photographer")}
-    except Exception as e:
-        logger.warning(f"Pexels photo search failed: {e}")
-
-    return None
-
-def search_pixabay(query):
-    api_key = os.environ.get("PIXABAY_API_KEY")
-    if not api_key:
-        return None
-
-    # Try video first
-    try:
-        url = f"https://pixabay.com/api/videos/?key={api_key}&q={urllib.parse.quote(query)}&safesearch=true&per_page=5"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("hits"):
-                video = random.choice(data["hits"])
-                videos = video.get("videos", {})
-                if videos.get("large", {}).get("url"):
-                    return {"url": videos["large"]["url"], "type": "video", "source": "pixabay", "author": video.get("user")}
-                elif videos.get("medium", {}).get("url"):
-                    return {"url": videos["medium"]["url"], "type": "video", "source": "pixabay", "author": video.get("user")}
-    except Exception as e:
-        logger.warning(f"Pixabay video search failed: {e}")
-
-    # Try photo
-    try:
-        url = f"https://pixabay.com/api/?key={api_key}&q={urllib.parse.quote(query)}&image_type=photo&orientation=vertical&safesearch=true&per_page=5"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("hits"):
-                photo = random.choice(data["hits"])
-                return {"url": photo["largeImageURL"], "type": "image", "source": "pixabay", "author": photo.get("user")}
-    except Exception as e:
-        logger.warning(f"Pixabay photo search failed: {e}")
-
-    return None
-
-def search_nasa(query):
-    try:
-        url = f"https://images-api.nasa.gov/search?q={urllib.parse.quote(query)}&media_type=image"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            items = data.get("collection", {}).get("items", [])
-            if items:
-                # Get links
-                links = items[0].get("links", [])
-                for link in links:
-                    if link.get("render") == "image":
-                        return {"url": link["href"], "type": "image", "source": "nasa", "author": "NASA"}
-    except Exception as e:
-        logger.warning(f"NASA search failed: {e}")
-    return None
-
-def download_media(url, output_path):
-    try:
-        resp = requests.get(url, stream=True, timeout=20)
-        resp.raise_for_status()
-        with open(output_path, 'wb') as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
-        return True
-    except Exception as e:
-        logger.error(f"Failed to download media from {url}: {e}")
+        if media_type == "image":
+            with Image.open(path) as image:
+                width, height = image.size
+            return width >= 640 and height >= 640
+        data = ffprobe(path)
+        stream = next((row for row in data.get("streams", []) if row.get("codec_type") == "video"), None)
+        return bool(
+            stream
+            and int(stream.get("width", 0)) >= 640
+            and int(stream.get("height", 0)) >= 640
+            and float(data.get("format", {}).get("duration", 0) or 0) >= 0.25
+        )
+    except Exception:
         return False
 
-def generate_visuals(scenes, output_dir="assets/visuals", topic=""):
-    """
-    Downloads stock media or generates fallback slides for each scene.
-    Returns a list of dictionaries with 'path' and 'metadata'.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    visual_data = []
 
-    is_space_topic = any(kw in topic.lower() for kw in ["space", "planet", "galaxy", "black hole", "nasa", "moon", "mars", "asteroid", "universe", "star", "solar system"])
+def create_local_fallback(path: str | Path, seed_text: str) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(seed_text.encode("utf-8")).digest()
+    top = tuple(20 + value // 4 for value in digest[:3])
+    bottom = tuple(8 + value // 8 for value in digest[3:6])
+    image = Image.new("RGB", (1080, 1920), top)
+    draw = ImageDraw.Draw(image, "RGBA")
+    for y in range(1920):
+        ratio = y / 1919
+        color = tuple(round(top[i] * (1 - ratio) + bottom[i] * ratio) for i in range(3))
+        draw.line((0, y, 1080, y), fill=color)
+    for i in range(18):
+        x = (digest[i % len(digest)] * 37 + i * 97) % 1080
+        y = (digest[(i + 5) % len(digest)] * 53 + i * 131) % 1920
+        radius = 40 + digest[(i + 9) % len(digest)]
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=(255, 255, 255, 14), outline=(255, 255, 255, 28), width=2)
+    image.save(target, quality=94)
 
-    for i, scene in enumerate(scenes):
-        query = scene.get("search_query", scene.get("text", f"scene {i}"))
-        logger.info(f"Fetching visual for scene {i}: '{query}'")
 
-        media_info = None
+def _recent_visual_ids(history_path: str | Path) -> set[str]:
+    rows = read_json(history_path, [])
+    result: set[str] = set()
+    for row in rows[-20:]:
+        if isinstance(row, dict):
+            result.update(str(value) for value in row.get("visual_ids", []) if value)
+    return result
 
-        # 1. Pexels First
-        media_info = search_pexels(query)
 
-        # 2. Pixabay Fallback
-        if not media_info:
-            media_info = search_pixabay(query)
+def select_visuals(
+    scenes: list[dict[str, Any]], niche: str, work_dir: str | Path, output_dir: str | Path,
+    history_path: str | Path = "upload_history.json", min_score: float = 2.0,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    work = Path(work_dir)
+    output = Path(output_dir)
+    work.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
+    selected: list[dict[str, Any]] = []
+    all_candidates: list[dict[str, Any]] = []
+    attribution: list[dict[str, Any]] = []
+    used_ids = _recent_visual_ids(history_path)
+    current_ids: set[str] = set()
+    current_hashes: set[str] = set()
 
-        # 3. NASA Fallback
-        if not media_info and is_space_topic:
-            media_info = search_nasa(query)
-
-        # 4. Download and configure
-        if media_info:
-            ext = ".mp4" if media_info["type"] == "video" else ".jpg"
-            output_path = os.path.join(output_dir, f"scene_{i}{ext}")
-
-            logger.info(f"Downloading from {media_info['source']}...")
-            if download_media(media_info["url"], output_path):
-                visual_data.append({
-                    "path": output_path,
-                    "type": media_info["type"],
-                    "source": media_info["source"],
-                    "author": media_info.get("author", "Unknown")
-                })
+    for index, scene in enumerate(scenes):
+        query = str(scene.get("visual_query") or scene.get("visual_subject") or "abstract science")
+        keywords = list(scene.get("scene_keywords") or []) + query.split()
+        negatives = list(scene.get("visual_negative_terms") or [])
+        providers = (_nasa_candidates, _pexels_candidates, _pixabay_candidates) if niche == "space" else (_pexels_candidates, _pixabay_candidates)
+        candidates: list[VisualCandidate] = []
+        for provider in providers:
+            try:
+                candidates.extend(provider(query))
+            except requests.RequestException as exc:
+                logger.warning("Visual provider failed for %s: %s", query, exc)
+        deduped: dict[str, VisualCandidate] = {}
+        for candidate in candidates:
+            if not candidate.url:
                 continue
+            key = hashlib.sha256(candidate.url.encode()).hexdigest()
+            if key not in deduped:
+                candidate.score = score_candidate(candidate, keywords, negatives, used_ids | current_ids)
+                if candidate.provider == "nasa" and niche == "space":
+                    candidate.score += 1.0
+                if candidate.media_type == str(scene.get("preferred_media_type", "video")):
+                    candidate.score += 0.4
+                if candidate.width and candidate.height and candidate.width / max(1, candidate.height) > 1.95:
+                    candidate.rejected_reason = "landscape crop would discard too much of the frame"
+                    candidate.score = -50.0
+                elif min(candidate.width, candidate.height) < 640:
+                    candidate.rejected_reason = "resolution below 640 pixels"
+                    candidate.score = -50.0
+                elif candidate.score < min_score:
+                    candidate.rejected_reason = "metadata relevance score below threshold"
+                deduped[key] = candidate
+        ranked = sorted(deduped.values(), key=lambda row: row.score, reverse=True)
+        all_candidates.extend([{**asdict(row), "scene_index": index} for row in ranked[:12]])
 
-        # 5. Local Designed Fallback
-        logger.warning(f"No stock media found for scene {i}. Using local designed fallback.")
-        output_path = os.path.join(output_dir, f"scene_{i}.jpg")
-        fallback_path = create_local_fallback_image(scene.get("text", ""), output_path, scene_index=i, is_final=(i == len(scenes) - 1))
-        visual_data.append({
-            "path": fallback_path,
-            "type": "image",
-            "source": "local_fallback",
-            "author": "AutoShorts"
+        chosen: VisualCandidate | None = None
+        chosen_path: Path | None = None
+        for candidate in ranked:
+            if candidate.score < min_score or candidate.candidate_id in current_ids:
+                continue
+            suffix = ".mp4" if candidate.media_type == "video" else ".jpg"
+            destination = work / f"scene_{index:02d}_{candidate.provider}_{candidate.candidate_id}{suffix}"
+            try:
+                _download(candidate.url, destination)
+                if _valid_media(destination, candidate.media_type):
+                    content_hash = hashlib.sha256(destination.read_bytes()).hexdigest()
+                    if content_hash in current_hashes:
+                        candidate.rejected_reason = "duplicate media content"
+                        destination.unlink(missing_ok=True)
+                        continue
+                    current_hashes.add(content_hash)
+                    chosen, chosen_path = candidate, destination
+                    break
+                destination.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("Candidate download rejected: %s", exc)
+                destination.unlink(missing_ok=True)
+        if chosen is None or chosen_path is None:
+            chosen_path = work / f"scene_{index:02d}_local.jpg"
+            create_local_fallback(chosen_path, str(scene.get("visual_subject") or query))
+            chosen = VisualCandidate(
+                "local", f"local-{index}-{hashlib.sha1(query.encode()).hexdigest()[:10]}", "image", "", "",
+                str(scene.get("visual_subject") or query), keywords, 1080, 1920, "AutoShorts local fallback", "local", score=min_score,
+            )
+        current_ids.add(chosen.candidate_id)
+        row = {
+            **asdict(chosen), "path": str(chosen_path), "scene_index": index,
+            "visual_subject": scene.get("visual_subject", ""), "visual_query": query,
+        }
+        selected.append(row)
+        attribution.append({
+            "scene_index": index, "provider": chosen.provider, "author": chosen.author,
+            "source_url": chosen.source_url, "candidate_id": chosen.candidate_id,
+            "license_note": "Provider terms apply" if chosen.provider != "local" else "Generated locally by the pipeline",
         })
+    atomic_write_json(output / "visual_candidates.json", all_candidates)
+    atomic_write_json(output / "media_attribution.json", attribution)
+    create_contact_sheet(selected, output / "visual_contact_sheet.jpg")
+    return selected, all_candidates, attribution
 
-    return visual_data
+
+def create_contact_sheet(selected: list[dict[str, Any]], output_path: str | Path) -> None:
+    thumbs: list[Image.Image] = []
+    for row in selected:
+        path = Path(row["path"])
+        try:
+            if row["media_type"] == "video":
+                frame = path.with_suffix(".contact.jpg")
+                subprocess.run([
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "0.4", "-i", str(path),
+                    "-frames:v", "1", "-vf", "scale=270:480:force_original_aspect_ratio=increase,crop=270:480", str(frame),
+                ], check=True)
+                image = Image.open(frame).convert("RGB")
+            else:
+                image = Image.open(path).convert("RGB").resize((270, 480))
+            thumbs.append(image.copy())
+        except Exception:
+            continue
+    if not thumbs:
+        return
+    sheet = Image.new("RGB", (270 * len(thumbs), 480), (12, 12, 16))
+    for index, image in enumerate(thumbs):
+        sheet.paste(image.resize((270, 480)), (index * 270, 0))
+    sheet.save(output_path, quality=92)

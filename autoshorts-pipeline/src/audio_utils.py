@@ -1,92 +1,54 @@
+from __future__ import annotations
+
 import json
 import logging
-import os
-import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def audio_duration_seconds(audio_path: str) -> Optional[float]:
-    """Return audio duration using ffprobe, falling back to MoviePy."""
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error", "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1", audio_path,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return float(result.stdout.strip())
-    except Exception as exc:
-        logger.warning(f"ffprobe duration failed for {audio_path}: {exc}")
-    try:
-        from moviepy.editor import AudioFileClip
-        clip = AudioFileClip(audio_path)
-        duration = float(clip.duration)
-        clip.close()
-        return duration
-    except Exception as exc:
-        logger.warning(f"MoviePy duration failed for {audio_path}: {exc}")
-        return None
+def run_command(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    logger.debug("Running: %s", " ".join(command))
+    return subprocess.run(command, check=check, text=True, capture_output=True)
 
 
-def trim_silence_for_caption_sync(input_audio: str, output_audio: str) -> str:
-    """Trim leading/trailing silence so Whisper captions align to the actual final narration.
+def ffprobe(path: str | Path) -> dict[str, Any]:
+    result = run_command([
+        "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)
+    ])
+    return json.loads(result.stdout)
 
-    The final video must use this output file, and Whisper must transcribe this same file.
-    If trimming fails, the function copies the input to the output rather than breaking the run.
-    """
-    os.makedirs(os.path.dirname(output_audio) or ".", exist_ok=True)
-    original_duration = audio_duration_seconds(input_audio)
-    threshold = os.environ.get("SILENCE_THRESHOLD_DB", "-50dB")
-    start_dur = os.environ.get("SILENCE_START_DURATION", "0.12")
-    stop_dur = os.environ.get("SILENCE_STOP_DURATION", "0.18")
 
-    # Keep MP3 output for compatibility with MoviePy/ffmpeg in the existing pipeline.
-    # We use a reliable areverse trick to trim trailing silence instead of `stop_periods=1` which can aggressively chop mid-audio.
-    cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-i", input_audio,
-        "-af",
-        (
-            f"silenceremove=start_periods=1:start_duration={start_dur}:start_threshold={threshold},"
-            f"areverse,"
-            f"silenceremove=start_periods=1:start_duration={stop_dur}:start_threshold={threshold},"
-            f"areverse"
-        ),
-        "-ac", "1", "-ar", "44100", "-codec:a", "libmp3lame", "-q:a", "3",
-        output_audio,
-    ]
-    try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=90)
-        trimmed_duration = audio_duration_seconds(output_audio)
-        if not trimmed_duration or trimmed_duration < 1.0:
-            raise RuntimeError(f"trimmed audio duration invalid: {trimmed_duration}")
-        logger.info(
-            "Narration silence trim: original %.2fs -> final %.2fs (%s)",
-            float(original_duration or 0.0), float(trimmed_duration), output_audio,
-        )
-    except Exception as exc:
-        logger.warning(f"Silence trimming failed, copying original narration instead: {exc}")
-        shutil.copyfile(input_audio, output_audio)
-        trimmed_duration = audio_duration_seconds(output_audio)
+def duration_seconds(path: str | Path) -> float:
+    data = ffprobe(path)
+    duration = data.get("format", {}).get("duration")
+    if duration is None:
+        durations = [float(stream.get("duration", 0) or 0) for stream in data.get("streams", [])]
+        return max(durations, default=0.0)
+    return float(duration)
 
-    report_path = Path("output") / "audio_timing_report.json"
-    try:
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps({
-            "input_audio": input_audio,
-            "output_audio": output_audio,
-            "original_duration_seconds": original_duration,
-            "final_duration_seconds": trimmed_duration,
-            "silence_threshold_db": threshold,
-        }, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"Could not write audio timing report: {exc}")
 
-    return output_audio
+def has_audio_stream(path: str | Path) -> bool:
+    return any(stream.get("codec_type") == "audio" for stream in ffprobe(path).get("streams", []))
+
+
+def trim_to_canonical_wav(source_path: str | Path, output_path: str | Path) -> float:
+    """Decode and trim leading/trailing silence exactly once into canonical PCM audio."""
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    filter_expr = (
+        "silenceremove=start_periods=1:start_duration=0.05:start_threshold=-45dB,"
+        "areverse,"
+        "silenceremove=start_periods=1:start_duration=0.12:start_threshold=-45dB,"
+        "areverse"
+    )
+    run_command([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source_path),
+        "-af", filter_expr, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(target),
+    ])
+    duration = duration_seconds(target)
+    if duration <= 0.2:
+        raise RuntimeError(f"Canonical narration is unexpectedly short: {duration:.3f}s")
+    return duration

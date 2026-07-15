@@ -1,162 +1,410 @@
-import json
+from __future__ import annotations
+
 import logging
-import os
 import re
-from typing import Dict, List, Optional
+from dataclasses import asdict, dataclass
+from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any, Iterable
+
+from PIL import Image, ImageDraw, ImageFont
+
+from .atomic_io import atomic_write_json, atomic_write_text
+from .audio_utils import run_command
 
 logger = logging.getLogger(__name__)
 
-
-def _clean_word(word: str) -> str:
-    word = re.sub(r"\s+", " ", str(word or "")).strip()
-    # Whisper often returns leading spaces. Keep punctuation; remove only weird whitespace.
-    return word
+ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"]
+TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
 
 
-def _load_audio_duration(audio_path: str) -> Optional[float]:
-    try:
-        from moviepy.editor import AudioFileClip
-        clip = AudioFileClip(audio_path)
-        duration = float(clip.duration)
-        clip.close()
-        return duration
-    except Exception as exc:
-        logger.warning(f"Could not determine audio duration for subtitle validation: {exc}")
-        return None
+@dataclass(slots=True)
+class WordTiming:
+    word: str
+    normalized: str
+    start: float
+    end: float
+    source: str
+    matched: bool
 
 
-def _fallback_even_timings(reference_text: str, duration: Optional[float]) -> List[Dict]:
-    """Emergency fallback only. Uses evenly distributed timings across actual audio duration."""
-    words = [_clean_word(w) for w in str(reference_text or "").split() if _clean_word(w)]
+@dataclass(slots=True)
+class CaptionChunk:
+    text: str
+    start: float
+    end: float
+    words: list[str]
+
+
+def _integer_to_words(value: int) -> list[str]:
+    if value < 0:
+        return ["minus", *_integer_to_words(abs(value))]
+    if value < 20:
+        return [ONES[value]]
+    if value < 100:
+        return [TENS[value // 10]] + (_integer_to_words(value % 10) if value % 10 else [])
+    if value < 1_000:
+        return [ONES[value // 100], "hundred"] + (_integer_to_words(value % 100) if value % 100 else [])
+    if value < 1_000_000:
+        return _integer_to_words(value // 1_000) + ["thousand"] + (_integer_to_words(value % 1_000) if value % 1_000 else [])
+    if value < 1_000_000_000:
+        return _integer_to_words(value // 1_000_000) + ["million"] + (_integer_to_words(value % 1_000_000) if value % 1_000_000 else [])
+    return [str(value)]
+
+
+def _number_token_to_words(token: str) -> list[str]:
+    cleaned = token.replace(",", "")
+    if "." in cleaned:
+        whole, decimal = cleaned.split(".", 1)
+        words = _integer_to_words(int(whole or "0")) + ["point"]
+        words.extend(ONES[int(digit)] for digit in decimal if digit.isdigit())
+        return [item for group in words for item in (group if isinstance(group, list) else [group])]
+    return _integer_to_words(int(cleaned))
+
+
+def normalize_word(value: str) -> str:
+    text = str(value or "").strip().lower().replace("’", "'")
+    text = re.sub(r"(?<=\w)'(?=\w)", "", text)
+    return re.sub(r"[^a-z0-9]+", "", text)
+
+
+def script_tokens(script: str) -> list[dict[str, Any]]:
+    raw = re.findall(r"\d[\d,]*(?:\.\d+)?|\b[A-Za-z]+(?:[’'-][A-Za-z]+)*\b|[%£$€]|[.!?,;:]", script)
+    tokens: list[dict[str, Any]] = []
+    for item in raw:
+        if re.fullmatch(r"[.!?,;:]", item):
+            if tokens:
+                tokens[-1]["display"] += item
+                tokens[-1]["punctuation"] = item
+            continue
+        if re.fullmatch(r"\d[\d,]*(?:\.\d+)?", item):
+            for expanded in _number_token_to_words(item):
+                tokens.append({"display": expanded, "normalized": normalize_word(expanded), "punctuation": ""})
+            continue
+        if item == "%":
+            item = "percent"
+        elif item in {"$", "£", "€"}:
+            item = {"$": "dollars", "£": "pounds", "€": "euros"}[item]
+        normalized = normalize_word(item)
+        if normalized:
+            tokens.append({"display": item, "normalized": normalized, "punctuation": ""})
+    return tokens
+
+
+def _recognized_tokens(words: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for row in words:
+        raw = str(row.get("word", "")).strip()
+        pieces = script_tokens(raw)
+        if not pieces:
+            continue
+        start = max(0.0, float(row.get("start", 0.0) or 0.0))
+        end = max(start + 0.03, float(row.get("end", start + 0.03) or start + 0.03))
+        span = (end - start) / len(pieces)
+        for index, piece in enumerate(pieces):
+            piece_start = start + index * span
+            result.append({
+                "word": piece["display"],
+                "normalized": piece["normalized"],
+                "start": piece_start,
+                "end": start + (index + 1) * span,
+            })
+    return result
+
+
+def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]], duration: float) -> tuple[list[WordTiming], dict[str, Any]]:
+    scripted = script_tokens(script)
+    recognized = _recognized_tokens(whisper_words)
+    if not scripted:
+        raise ValueError("Narration script contains no words")
+    duration = max(float(duration), 0.1)
+    script_norm = [row["normalized"] for row in scripted]
+    whisper_norm = [row["normalized"] for row in recognized]
+    matcher = SequenceMatcher(a=script_norm, b=whisper_norm, autojunk=False)
+    mapping: dict[int, int] = {}
+    for block in matcher.get_matching_blocks():
+        for offset in range(block.size):
+            mapping[block.a + offset] = block.b + offset
+
+    aligned: list[WordTiming | None] = [None] * len(scripted)
+    for script_index, whisper_index in mapping.items():
+        source = recognized[whisper_index]
+        start = min(max(0.0, source["start"]), duration)
+        end = min(max(start + 0.03, source["end"]), duration)
+        aligned[script_index] = WordTiming(
+            scripted[script_index]["display"], scripted[script_index]["normalized"],
+            start, end, "whisper", True,
+        )
+
+    matched_indices = sorted(mapping)
+    if not matched_indices:
+        step = duration / len(scripted)
+        aligned = [
+            WordTiming(row["display"], row["normalized"], index * step, min(duration, (index + 1) * step), "interpolated_all", False)
+            for index, row in enumerate(scripted)
+        ]
+    else:
+        boundaries = [-1, *matched_indices, len(scripted)]
+        for left_index, right_index in zip(boundaries, boundaries[1:]):
+            missing = list(range(left_index + 1, right_index))
+            if not missing:
+                continue
+            left_end = aligned[left_index].end if left_index >= 0 and aligned[left_index] else 0.0
+            right_start = aligned[right_index].start if right_index < len(scripted) and aligned[right_index] else duration
+            available = max(0.03 * len(missing), right_start - left_end)
+            step = available / len(missing)
+            for offset, script_index in enumerate(missing):
+                start = min(duration, left_end + offset * step)
+                end = min(duration, max(start + 0.03, left_end + (offset + 1) * step))
+                row = scripted[script_index]
+                aligned[script_index] = WordTiming(row["display"], row["normalized"], start, end, "interpolated", False)
+
+    output = [row for row in aligned if row is not None]
+    previous_end = 0.0
+    for index, row in enumerate(output):
+        remaining = len(output) - index - 1
+        latest_end = max(0.0, duration - remaining * 0.001)
+        row.start = max(previous_end, min(float(row.start), latest_end))
+        row.end = min(duration, max(row.start + 0.001, float(row.end)))
+        if row.end < row.start:
+            row.end = row.start
+        row.start = round(row.start, 3)
+        row.end = round(row.end, 3)
+        previous_end = row.end
+
+    matched_count = sum(row.matched for row in output)
+    raw_coverage = matched_count / len(scripted)
+    warnings: list[str] = []
+    if raw_coverage < 0.90:
+        warnings.append("Raw Whisper coverage is below the 90% target")
+    if not recognized:
+        warnings.append("Whisper returned no words; all timings were interpolated")
+    report = {
+        "narration_word_count": len(scripted),
+        "raw_whisper_word_count": len(recognized),
+        "matched_script_words": matched_count,
+        "raw_coverage_ratio": round(raw_coverage, 4),
+        "final_aligned_word_count": len(output),
+        "final_alignment_ratio": round(len(output) / len(scripted), 4),
+        "first_detected_speech_time": round(recognized[0]["start"], 3) if recognized else None,
+        "last_speech_time": round(recognized[-1]["end"], 3) if recognized else None,
+        "alignment_warnings": warnings,
+    }
+    return output, report
+
+
+def _group_words(words: list[WordTiming], min_words: int, max_words: int) -> list[list[WordTiming]]:
+    groups: list[list[WordTiming]] = []
+    current: list[WordTiming] = []
+    for word in words:
+        if current and len(current) >= min_words and word.end - current[0].start > 1.66:
+            groups.append(current)
+            current = []
+        current.append(word)
+        punctuation_break = bool(re.search(r"[.!?,;:]$", word.word))
+        if len(current) >= max_words or (len(current) >= min_words and punctuation_break):
+            groups.append(current)
+            current = []
+    if current:
+        groups.append(current)
+    if len(groups) >= 2 and len(groups[-1]) == 1:
+        if len(groups[-2]) > min_words:
+            groups[-1].insert(0, groups[-2].pop())
+        elif len(groups[-2]) + 1 <= max_words:
+            groups[-2].extend(groups.pop())
+    return groups
+
+
+def _build_chunk(rows: list[WordTiming], duration: float) -> CaptionChunk:
+    start = max(0.0, rows[0].start)
+    natural_end = min(duration, rows[-1].end + 0.14)
+    end = min(start + 1.8, max(natural_end, start + 0.35), duration)
+    return CaptionChunk(
+        text=" ".join(row.word for row in rows),
+        start=round(start, 3),
+        end=round(end, 3),
+        words=[row.word for row in rows],
+    )
+
+
+def create_caption_chunks(words: list[WordTiming], audio_duration: float, min_words: int = 2, max_words: int = 4) -> list[CaptionChunk]:
     if not words:
         return []
-    duration = float(duration or max(2.5, len(words) * 0.32))
-    step = duration / max(1, len(words))
-    timings = []
-    for i, word in enumerate(words):
-        start = i * step
-        end = min(duration, start + max(0.12, step * 0.85))
-        timings.append({"word": word, "start": round(start, 3), "end": round(end, 3), "source": "fallback_even"})
-    return timings
+    chunks = [_build_chunk(group, audio_duration) for group in _group_words(words, min_words, max_words)]
+    for index in range(len(chunks) - 1):
+        current, following = chunks[index], chunks[index + 1]
+        if current.end > following.start:
+            current.end = round(max(current.start + 0.01, following.start), 3)
+        else:
+            gap = following.start - current.end
+            if 0 < gap <= 0.18:
+                current.end = round(following.start, 3)
+    chunks[-1].end = min(chunks[-1].end, round(audio_duration, 3))
+    return chunks
 
 
-def transcribe_audio_with_whisper(
-    audio_path: str,
-    output_json_path: str,
-    reference_text: str = "",
-    model_size: Optional[str] = None,
-) -> List[Dict]:
-    """
-    Create caption timings from the ACTUAL synthesized audio, not from predicted TTS events.
+def _ass_time(seconds: float) -> str:
+    seconds = max(0.0, seconds)
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"{hours}:{minutes:02d}:{seconds % 60:05.2f}"
 
-    This follows the more reliable MoneyPrinter-style architecture:
-    1. generate the narration audio
-    2. transcribe that actual audio with an STT model
-    3. use the returned timestamps for burnt-in captions
 
-    The previous edge-tts WordBoundary timings can drift after encoding/trimming/rendering.
-    Whisper/faster-whisper aligns captions to the real audio file, which is what viewers hear.
-    """
-    os.makedirs(os.path.dirname(output_json_path) or ".", exist_ok=True)
-    duration = _load_audio_duration(audio_path)
-    model_size = model_size or os.environ.get("WHISPER_MODEL", "tiny.en")
-    device = os.environ.get("WHISPER_DEVICE", "cpu")
-    compute_type = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
+def _wrap_caption(text: str, limit: int = 24) -> str:
+    if len(text) <= limit:
+        return text
+    words = text.split()
+    best_index = min(range(1, len(words)), key=lambda index: abs(len(" ".join(words[:index])) - len(" ".join(words[index:]))))
+    return " ".join(words[:best_index]) + r"\N" + " ".join(words[best_index:])
 
-    words: List[Dict] = []
-    try:
-        from faster_whisper import WhisperModel
 
-        logger.info(
-            f"Transcribing actual narration audio with faster-whisper model={model_size}, "
-            f"device={device}, compute_type={compute_type}"
-        )
-        model = WhisperModel(model_size, device=device, compute_type=compute_type)
-        segments, info = model.transcribe(
-            audio_path,
-            language="en",
-            word_timestamps=True,
-            vad_filter=False,
-            beam_size=1,
-            condition_on_previous_text=False,
-            initial_prompt=(reference_text[:220] if reference_text else None),
-        )
+def write_ass(chunks: list[CaptionChunk], path: str | Path, width: int = 1080, height: int = 1920) -> None:
+    font_size = 54 if width >= 1000 else max(22, round(width * 0.05))
+    margin_v = 330 if height >= 1800 else max(110, round(height * 0.17))
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
 
-        for segment in segments:
-            for w in getattr(segment, "words", None) or []:
-                word = _clean_word(getattr(w, "word", ""))
-                if not word:
-                    continue
-                start = float(getattr(w, "start", 0.0) or 0.0)
-                end = float(getattr(w, "end", start + 0.25) or start + 0.25)
-                if duration is not None:
-                    start = max(0.0, min(start, duration))
-                    end = max(start + 0.08, min(end, duration))
-                elif end <= start:
-                    end = start + 0.25
-                words.append({
-                    "word": word,
-                    "start": round(start, 3),
-                    "end": round(end, 3),
-                    "source": "faster_whisper",
-                })
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Caption,DejaVu Sans,{font_size},&H00FFFFFF,&H0000D7FF,&H00000000,&H98000000,-1,0,0,0,100,100,0,0,3,3,0,2,100,100,{margin_v},1
 
-        # Sort and remove obviously broken timestamps.
-        words = sorted(words, key=lambda x: (x["start"], x["end"]))
-        cleaned: List[Dict] = []
-        last_start = -1.0
-        for w in words:
-            if w["start"] < last_start - 0.25:
-                continue
-            if w["end"] <= w["start"]:
-                w["end"] = w["start"] + 0.18
-            cleaned.append(w)
-            last_start = w["start"]
-        words = cleaned
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    lines = [header]
+    for chunk in chunks:
+        safe = _wrap_caption(chunk.text.replace("{", "(").replace("}", ")").replace("\n", " "))
+        lines.append(f"Dialogue: 0,{_ass_time(chunk.start)},{_ass_time(chunk.end)},Caption,,0,0,0,,{safe}\n")
+    atomic_write_text(path, "".join(lines))
 
-        logger.info(f"Whisper detected {len(words)} timed words from actual audio.")
-    except Exception as exc:
-        logger.warning(f"Whisper subtitle transcription failed; using even fallback timings. Error: {exc}", exc_info=True)
-        words = _fallback_even_timings(reference_text, duration)
 
-    if not words:
-        logger.warning("Whisper returned zero words; using even fallback timings.")
-        words = _fallback_even_timings(reference_text, duration)
+def _max_active_speech_caption_gap(words: list[WordTiming], chunks: list[CaptionChunk]) -> float:
+    largest = 0.0
+    for word in words:
+        overlaps = [chunk for chunk in chunks if chunk.end > word.start and chunk.start < word.end]
+        if not overlaps:
+            largest = max(largest, max(0.0, word.end - word.start))
+            continue
+        covered_start = min(chunk.start for chunk in overlaps)
+        covered_end = max(chunk.end for chunk in overlaps)
+        largest = max(largest, max(0.0, covered_start - word.start), max(0.0, word.end - covered_end))
+    return largest
 
-    # Do NOT force the first word to 0.0 or the last word to the full duration.
-    # Captions must be speech-aware: no stale first caption during leading silence, and
-    # no final caption held after narration ends.
-    if duration is not None and words:
-        first_word_start = float(words[0]["start"])
-        last_word_end = float(words[-1]["end"])
-        logger.info(
-            "Whisper timing report: audio %.2fs | first word %.2fs | last word %.2fs",
-            float(duration), first_word_start, last_word_end,
-        )
+
+def transcribe_and_align(
+    audio_path: str | Path,
+    exact_script: str,
+    audio_duration: float,
+    output_dir: str | Path,
+    primary_model: str = "base.en",
+    fallback_model: str = "small.en",
+    device: str = "cpu",
+    compute_type: str = "int8",
+) -> tuple[list[WordTiming], list[CaptionChunk], dict[str, Any]]:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    model_attempts = list(dict.fromkeys([primary_model, fallback_model]))
+    final_words: list[WordTiming] = []
+    final_report: dict[str, Any] = {}
+    used_model = primary_model
+    for attempt_index, model_name in enumerate(model_attempts):
+        used_model = model_name
+        logger.info("Transcribing canonical narration with faster-whisper model=%s", model_name)
         try:
-            report_path = os.path.join(os.path.dirname(output_json_path) or ".", "caption_timing_report.json")
-            with open(report_path, "w", encoding="utf-8") as rf:
-                json.dump({
-                    "audio_path": audio_path,
-                    "audio_duration_seconds": duration,
-                    "first_word_start_seconds": first_word_start,
-                    "last_word_end_seconds": last_word_end,
-                    "word_count": len(words),
-                    "source": words[0].get("source"),
-                }, rf, indent=2)
-        except Exception as exc:
-            logger.warning(f"Could not write caption timing report: {exc}")
+            from faster_whisper import WhisperModel
+        except ImportError as exc:
+            raise RuntimeError("faster-whisper is required for subtitle generation") from exc
+        model = WhisperModel(model_name, device=device, compute_type=compute_type)
+        segments, _ = model.transcribe(
+            str(audio_path), language="en", beam_size=5, word_timestamps=True,
+            vad_filter=True,
+            vad_parameters={
+                "threshold": 0.35,
+                "min_speech_duration_ms": 120,
+                "min_silence_duration_ms": 300,
+                "speech_pad_ms": 120,
+            },
+            condition_on_previous_text=False,
+        )
+        raw_words: list[dict[str, Any]] = []
+        for segment in segments:
+            for word in segment.words or []:
+                raw_words.append({
+                    "word": word.word,
+                    "start": word.start,
+                    "end": word.end,
+                    "probability": word.probability,
+                })
+        atomic_write_json(output / f"whisper_words_{model_name.replace('.', '_')}.json", raw_words)
+        final_words, final_report = align_script_to_whisper(exact_script, raw_words, audio_duration)
+        if final_report["raw_coverage_ratio"] >= 0.90 or attempt_index == len(model_attempts) - 1:
+            break
 
-    with open(output_json_path, "w", encoding="utf-8") as f:
-        json.dump(words, f, indent=2, ensure_ascii=False)
+    chunks = create_caption_chunks(final_words, audio_duration)
+    first_caption = chunks[0].start if chunks else None
+    first_speech = final_report.get("first_detected_speech_time")
+    max_tail = max((chunk.end - words[-1].end for chunk, words in zip(chunks, _group_words(final_words, 2, 4))), default=0.0)
+    final_report.update({
+        "model_first_attempted": primary_model,
+        "model_finally_used": used_model,
+        "first_caption_time": first_caption,
+        "last_caption_time": chunks[-1].end if chunks else None,
+        "maximum_active_speech_caption_gap": round(_max_active_speech_caption_gap(final_words, chunks), 3),
+        "maximum_caption_tail_after_word": round(max(0.0, max_tail), 3),
+        "caption_chunk_count": len(chunks),
+    })
+    if first_speech is not None and first_caption is not None:
+        if first_caption < first_speech - 0.10:
+            final_report["alignment_warnings"].append("First caption begins more than 0.10s before detected speech")
+        if first_caption > first_speech + 0.25:
+            final_report["alignment_warnings"].append("First caption begins more than 0.25s after detected speech")
+    if final_report["maximum_active_speech_caption_gap"] > 0.5:
+        final_report["alignment_warnings"].append("A caption gap exceeds 0.5s while a spoken word is active")
+    if final_report["maximum_caption_tail_after_word"] > 0.20:
+        final_report["alignment_warnings"].append("A caption remains visible too long after its final word")
 
-    logger.info(f"Saved synced caption timings to {output_json_path}")
-    return words
+    atomic_write_json(output / "subtitle_alignment_report.json", final_report)
+    atomic_write_json(output / "aligned_words.json", [asdict(row) for row in final_words])
+    atomic_write_json(output / "caption_chunks.json", [asdict(row) for row in chunks])
+    write_ass(chunks, output / "captions.ass")
+    create_debug_images(chunks, output)
+    return final_words, chunks, final_report
 
 
-def load_caption_timings(path: str) -> List[Dict]:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"Caption timing JSON must be a list: {path}")
-    return data
+def render_subtitle_test(audio_path: str | Path, captions_ass_path: str | Path, output_path: str | Path) -> None:
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    ass = str(Path(captions_ass_path).resolve()).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    run_command([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "color=c=0x171B26:s=1080x1920:r=30",
+        "-i", str(audio_path), "-vf", f"subtitles='{ass}'", "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+        "-shortest", "-movflags", "+faststart", str(target),
+    ])
+
+
+def create_debug_images(chunks: list[CaptionChunk], output_dir: str | Path, limit: int = 6) -> None:
+    output = Path(output_dir)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 54)
+    except OSError:
+        font = ImageFont.load_default()
+    for index, chunk in enumerate(chunks[:limit]):
+        image = Image.new("RGB", (1080, 1920), (24, 28, 38))
+        draw = ImageDraw.Draw(image)
+        display = chunk.text
+        box = draw.multiline_textbbox((0, 0), display, font=font, stroke_width=3, align="center")
+        text_width = box[2] - box[0]
+        text_height = box[3] - box[1]
+        x = (1080 - text_width) // 2
+        y = 1450 - text_height // 2
+        pad_x, pad_y = 28, 18
+        draw.rounded_rectangle((x - pad_x, y - pad_y, x + text_width + pad_x, y + text_height + pad_y), radius=18, fill=(0, 0, 0, 150))
+        draw.multiline_text((x, y), display, font=font, fill="white", stroke_width=3, stroke_fill="black", align="center")
+        draw.text((40, 40), f"{chunk.start:.2f}s - {chunk.end:.2f}s", font=ImageFont.load_default(), fill="white")
+        image.save(output / f"caption_debug_{index:02d}.png")

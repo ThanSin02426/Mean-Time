@@ -1,472 +1,207 @@
-import os
-import math
+from __future__ import annotations
+
+import json
 import logging
-import random
-from typing import List, Dict
+import subprocess
+from pathlib import Path
+from typing import Any
 
-from moviepy.editor import (
-    AudioFileClip, ImageClip, CompositeVideoClip, CompositeAudioClip,
-    concatenate_audioclips
-)
-from PIL import Image, ImageDraw, ImageFont
-
-# MoviePy 1.0.3 still references PIL.Image.ANTIALIAS, removed in Pillow 10.
-if not hasattr(Image, "ANTIALIAS"):
-    Image.ANTIALIAS = Image.Resampling.LANCZOS
+from .audio_utils import duration_seconds, ffprobe, run_command
+from .subtitles import WordTiming, script_tokens
 
 logger = logging.getLogger(__name__)
 
-W, H = 1080, 1920
+
+def allocate_scene_durations(scenes: list[dict[str, Any]], total_duration: float) -> list[float]:
+    if not scenes:
+        raise ValueError("At least one scene is required")
+    weights = [max(1, len(str(scene.get("narration", "")).split())) for scene in scenes]
+    weight_sum = sum(weights)
+    raw = [total_duration * weight / weight_sum for weight in weights]
+    minimum = min(2.5, total_duration / len(scenes))
+    adjusted = [max(minimum, value) for value in raw]
+    scale = total_duration / sum(adjusted)
+    durations = [round(value * scale, 3) for value in adjusted]
+    durations[-1] = round(total_duration - sum(durations[:-1]), 3)
+    return durations
 
 
-def _font(size: int, bold: bool = True):
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
-    ]
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
+
+def allocate_scene_durations_from_alignment(
+    scenes: list[dict[str, Any]], aligned_words: list[WordTiming], total_duration: float
+) -> list[float]:
+    """Use the canonical narration alignment to place visual cuts at scene speech boundaries."""
+    if not scenes or not aligned_words:
+        return allocate_scene_durations(scenes, total_duration)
+    counts = [len(script_tokens(str(scene.get("narration", "")))) for scene in scenes]
+    if sum(counts) != len(aligned_words) or any(count <= 0 for count in counts):
+        logger.warning("Scene/script token counts do not match aligned words; using proportional allocation")
+        return allocate_scene_durations(scenes, total_duration)
+    boundaries = [0.0]
+    cursor = 0
+    for count in counts[:-1]:
+        cursor += count
+        boundaries.append(min(total_duration, max(boundaries[-1], aligned_words[cursor - 1].end)))
+    boundaries.append(total_duration)
+    durations = [round(boundaries[index + 1] - boundaries[index], 3) for index in range(len(scenes))]
+    if any(duration < 1.0 for duration in durations):
+        logger.warning("Alignment-derived scene duration was too short; using proportional allocation")
+        return allocate_scene_durations(scenes, total_duration)
+    durations[-1] = round(total_duration - sum(durations[:-1]), 3)
+    return durations
 
 
-def resize_image_for_video(image_path, target_size=(W, H)):
-    """Resize/crop to vertical Shorts format."""
-    img = Image.open(image_path).convert("RGB")
-    img_ratio = img.width / img.height
-    target_ratio = target_size[0] / target_size[1]
-
-    if img_ratio > target_ratio:
-        new_width = int(img.height * target_ratio)
-        offset = (img.width - new_width) // 2
-        img = img.crop((offset, 0, offset + new_width, img.height))
-    else:
-        new_height = int(img.width / target_ratio)
-        offset = (img.height - new_height) // 2
-        img = img.crop((0, offset, img.width, offset + new_height))
-
-    resample = getattr(Image, "Resampling", Image).LANCZOS
-    img = img.resize(target_size, resample)
-    temp_path = f"{image_path}_resized.jpg"
-    img.save(temp_path, quality=95)
-    return temp_path
-
-
-def apply_ken_burns(image_clip, scene_index=0):
-    """Stable deterministic slow zoom/pan."""
-    import numpy as np
-
-    directions = [(-1, -1), (1, -1), (-1, 1), (1, 1), (0, 0)]
-    pan_x, pan_y = directions[scene_index % len(directions)]
-
-    def resize_frame(get_frame, t):
-        frame = get_frame(t)
-        duration = max(image_clip.duration, 0.001)
-        progress = min(max(t / duration, 0.0), 1.0)
-        zoom = 1.03 + 0.07 * progress
-
-        h, w = frame.shape[:2]
-        new_w, new_h = int(w * zoom), int(h * zoom)
-        img = Image.fromarray(frame)
-        resample = getattr(Image, "Resampling", Image).LANCZOS
-        resized = img.resize((new_w, new_h), resample)
-
-        max_x = new_w - w
-        max_y = new_h - h
-        center_x = max_x // 2
-        center_y = max_y // 2
-        left = int(center_x + pan_x * max_x * 0.18 * (progress - 0.5))
-        top = int(center_y + pan_y * max_y * 0.18 * (progress - 0.5))
-        left = max(0, min(left, max_x))
-        top = max(0, min(top, max_y))
-        return np.array(resized.crop((left, top, left + w, top + h)))
-
-    return image_clip.fl(resize_frame)
-
-
-def _text_size(draw, text, font):
-    box = draw.textbbox((0, 0), text, font=font, stroke_width=0)
-    return box[2] - box[0], box[3] - box[1]
-
-
-def _wrap_words(words: List[str], font, max_width: int, max_lines: int = 2):
-    dummy = Image.new("RGBA", (10, 10))
-    draw = ImageDraw.Draw(dummy)
-    lines, current = [], ""
-    for word in words:
-        trial = f"{current} {word}".strip()
-        tw, _ = _text_size(draw, trial, font)
-        if tw <= max_width:
-            current = trial
-        else:
-            if current:
-                lines.append(current)
-            current = word
-        if len(lines) >= max_lines:
-            break
-    if current and len(lines) < max_lines:
-        lines.append(current)
-    return lines[:max_lines]
-
-
-def _make_caption_png(chunk: Dict, out_path: str, active_word_index: int = -1):
-    """Create a transparent caption overlay PNG using PIL. No ImageMagick/TextClip dependency."""
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    font = _font(84, True)
-    small_font = _font(76, True)
-    words = [w["word"].strip() for w in chunk["words"] if w.get("word", "").strip()]
-    words = [w for w in words if w]
-    if not words:
-        img.save(out_path)
-        return out_path
-
-    # Use a smaller font if needed.
-    lines = _wrap_words(words, font, 900, 2)
-    if len(" ".join(lines)) < len(" ".join(words)) - 3:
-        font = small_font
-        lines = _wrap_words(words, font, 920, 2)
-
-    line_h = 100
-    pad_x, pad_y = 54, 34
-    block_h = len(lines) * line_h + pad_y * 2
-    y0 = 1335  # safe bottom third
-    max_line_w = max((_text_size(draw, line, font)[0] for line in lines), default=0)
-    box_w = min(W - 110, max_line_w + pad_x * 2)
-    x0 = (W - box_w) // 2
-
-    draw.rounded_rectangle((x0, y0, x0 + box_w, y0 + block_h), radius=42, fill=(0, 0, 0, 180), outline=(255, 215, 70, 160), width=3)
-
-    # Draw by word so we can highlight current word approximately.
-    word_counter = 0
-    y = y0 + pad_y + 45
-    for line in lines:
-        line_words = line.split()
-        total_w = sum(_text_size(draw, w, font)[0] for w in line_words) + (len(line_words) - 1) * 24
-        x = (W - total_w) // 2
-        for word in line_words:
-            is_active = (word_counter == active_word_index) if active_word_index >= 0 else False
-            fill = (255, 221, 66, 255) if is_active else (255, 255, 255, 255)
-            draw.text((x, y), word, font=font, fill=fill, anchor="lm", stroke_width=6, stroke_fill=(0, 0, 0, 245))
-            x += _text_size(draw, word, font)[0] + 24
-            word_counter += 1
-        y += line_h
-
-    img.save(out_path)
-    return out_path
-
-
-def _group_caption_chunks(word_timings: List[Dict], max_words=4, total_duration: float = None):
-    """
-    Build phrase captions from ACTUAL STT/Whisper timings.
-
-    Sync rule:
-    - chunk start = first spoken word start, with tiny early lead
-    - chunk end = next chunk start, so captions remain present through pauses
-    - final chunk extends to the final video/audio duration
-
-    This keeps subtitles visible through the whole short while still changing only
-    when the spoken audio reaches the next phrase.
-    """
-    cleaned = []
-    for w in word_timings:
-        word = str(w.get("word", "")).strip()
-        if not word:
-            continue
-        try:
-            start = float(w.get("start", 0.0))
-            end = float(w.get("end", start + 0.25))
-        except Exception:
-            continue
-        if end <= start:
-            end = start + 0.18
-        if total_duration is not None:
-            start = max(0.0, min(start, float(total_duration)))
-            end = max(start + 0.08, min(end, float(total_duration)))
-        cleaned.append({"word": word, "start": start, "end": end})
-
-    if not cleaned:
-        return []
-
-    cleaned.sort(key=lambda x: (x["start"], x["end"]))
-    raw_chunks, cur = [], []
-    for i, w in enumerate(cleaned):
-        cur.append(w)
-        is_last = i == len(cleaned) - 1
-        next_start = cleaned[i + 1]["start"] if not is_last else None
-        gap_after_word = (next_start - w["end"]) if next_start is not None else 0.0
-        punctuation_break = w["word"].endswith((".", "?", "!", ":", ";"))
-        should_break = len(cur) >= max_words or punctuation_break or gap_after_word > 0.9 or is_last
-        if should_break:
-            raw_chunks.append({"words": cur[:], "start": cur[0]["start"], "natural_end": cur[-1]["end"]})
-            cur = []
-
-    if not raw_chunks:
-        return []
-
-    td = float(total_duration) if total_duration is not None else None
-    lead = float(os.environ.get("CAPTION_LEAD_SECONDS", "0.0") or 0.0)
-    lead = max(0.0, min(lead, 0.15))
-
-    for i, chunk in enumerate(raw_chunks):
-        # Speech-aware policy: captions start at the first spoken word timestamp.
-        # Do not pin the first caption to 0.0; that caused the stale subtitle hold bug.
-        chunk["start"] = max(0.0, float(chunk["start"]) - lead)
-
-        if i < len(raw_chunks) - 1:
-            next_raw_start = float(raw_chunks[i + 1]["start"])
-            gap_to_next = max(0.0, next_raw_start - float(chunk["natural_end"]))
-            if gap_to_next <= 0.35:
-                # Tiny pauses are normal in speech; keep captions present through them.
-                chunk["end"] = max(chunk["start"] + 0.45, next_raw_start - lead)
-            else:
-                # Long silence: do not hold stale captions across it.
-                chunk["end"] = max(chunk["start"] + 0.45, float(chunk["natural_end"]) + 0.22)
-        else:
-            # Final caption ends shortly after the final spoken word, not at full video end.
-            chunk["end"] = max(chunk["start"] + 0.45, float(chunk["natural_end"]) + 0.35)
-
-        if td is not None:
-            chunk["start"] = min(chunk["start"], max(0.0, td - 0.35))
-            chunk["end"] = min(max(chunk["end"], chunk["start"] + 0.45), td)
-        if chunk["end"] <= chunk["start"]:
-            chunk["end"] = chunk["start"] + 0.45
-
-    # Validate the exact bug we are fixing.
-    first_word_start = float(cleaned[0]["start"])
-    first_caption_start = float(raw_chunks[0]["start"])
-    if first_word_start - first_caption_start > 0.25:
-        raise RuntimeError(
-            f"Caption timing failed: first caption starts {first_word_start - first_caption_start:.2f}s "
-            f"before the first spoken word ({first_caption_start:.2f}s vs {first_word_start:.2f}s)."
-        )
-    logger.info(
-        "Caption timing anchors: first_word_start=%.2fs first_caption_start=%.2fs last_word_end=%.2fs",
-        first_word_start, first_caption_start, float(cleaned[-1]["end"]),
+def _scale_filter(width: int, height: int) -> str:
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},setsar=1,fps=30,format=yuv420p"
     )
 
-    return raw_chunks
 
-
-def _caption_overlay_clips(word_timings: List[Dict], total_duration: float, output_dir="output/captions"):
-    chunks = _group_caption_chunks(word_timings, max_words=4, total_duration=total_duration)
-    clips = []
-    os.makedirs(output_dir, exist_ok=True)
-
-    for idx, chunk in enumerate(chunks):
-        png_path = os.path.join(output_dir, f"caption_{idx:03d}.png")
-        # Phrase captions are synced by chunk timing. Use stable highlight on the first word.
-        _make_caption_png(chunk, png_path, active_word_index=0)
-        start = max(0.0, float(chunk["start"]))
-        end = min(float(chunk["end"]), float(total_duration))
-        duration = max(0.35, end - start)
-        clips.append(ImageClip(png_path).set_start(start).set_duration(duration))
-
-        if idx < 5:
-            sample_path = os.path.join("output", f"caption_sample_{idx:02d}.png")
-            try:
-                _make_caption_png(chunk, sample_path, active_word_index=0)
-            except Exception as exc:
-                logger.warning(f"Could not save caption sample {idx}: {exc}")
-
-    if chunks:
-        inter_caption_gap = 0.0
-        for prev, cur in zip(chunks, chunks[1:]):
-            inter_caption_gap = max(inter_caption_gap, max(0.0, float(cur["start"]) - float(prev["end"])))
-        first_start = float(chunks[0]["start"])
-        last_end = float(chunks[-1]["end"])
-        logger.info(
-            f"Caption coverage: {len(chunks)} chunks | first caption {first_start:.2f}s | "
-            f"last caption {last_end:.2f}s | max silent caption gap {inter_caption_gap:.2f}s | video {total_duration:.2f}s"
-        )
-        # Long gaps are allowed when Whisper detects real silence. We only fail for impossible timings.
-        if first_start < -0.01 or last_end > float(total_duration) + 0.05:
-            raise RuntimeError("Caption timing failed: caption timestamps outside video duration.")
-
-    logger.info(f"Created {len(clips)} caption overlay clips from {len(word_timings)} synced word timings")
-    return clips, chunks
-
-
-def fetch_pixabay_music():
-    """Searches Pixabay for a random background track and downloads it."""
-    import requests
-    api_key = os.environ.get("PIXABAY_API_KEY")
-    if not api_key:
-        return None
-
-    try:
-        url = f"https://pixabay.com/api/audio/?key={api_key}&q=cinematic&per_page=10"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("hits"):
-                track = random.choice(data["hits"])
-                download_url = track.get("audio")
-                if download_url:
-                    output_path = "output/temp_bg_music.mp3"
-                    os.makedirs("output", exist_ok=True)
-                    audio_resp = requests.get(download_url, timeout=20)
-                    with open(output_path, "wb") as f:
-                        f.write(audio_resp.content)
-                    return {"path": output_path, "source": "pixabay", "author": track.get("user")}
-    except Exception as e:
-        logger.warning(f"Pixabay music search failed: {e}")
-    return None
-
-def _add_music(final_audio, total_duration, music_dir):
-    music_path = None
-    music_meta = None
-
-    # 1. Try local music
-    if os.path.exists(music_dir) and os.path.isdir(music_dir):
-        music_files = [f for f in os.listdir(music_dir) if f.lower().endswith((".mp3", ".wav", ".m4a"))]
-        if music_files:
-            music_file = random.choice(music_files)
-            music_path = os.path.join(music_dir, music_file)
-            music_meta = {"source": "local", "file": music_file}
-
-    # 2. Try Pixabay music fallback
-    if not music_path:
-        pixabay_music = fetch_pixabay_music()
-        if pixabay_music:
-            music_path = pixabay_music["path"]
-            music_meta = {"source": pixabay_music["source"], "author": pixabay_music["author"]}
-
-    # 3. Mix
-    if music_path:
-        logger.info(f"Adding background music: {music_path}")
-        try:
-            bg = AudioFileClip(music_path)
-            if bg.duration < total_duration:
-                repeats = int(total_duration // bg.duration) + 1
-                bg = concatenate_audioclips([bg] * repeats)
-            bg = bg.subclip(0, total_duration).volumex(0.10)
-            return CompositeAudioClip([final_audio, bg]), music_meta
-        except Exception as e:
-            logger.warning(f"Failed to mix background music: {e}")
-
-    logger.info("No music available. Proceeding with narration-only audio.")
-    return final_audio, None
-
-def crop_video_to_vertical(clip):
-    """Crops a landscape video clip to 9:16 vertical."""
-    w, h = clip.size
-    target_ratio = 1080 / 1920.0
-    current_ratio = w / h
-
-    if current_ratio > target_ratio:
-        # Crop sides
-        new_w = int(h * target_ratio)
-        x_center = w / 2
-        clip = clip.crop(x1=x_center - new_w/2, y1=0, x2=x_center + new_w/2, y2=h)
+def prepare_visual_segment(
+    source_path: str | Path,
+    media_type: str,
+    duration: float,
+    output_path: str | Path,
+    width: int = 1080,
+    height: int = 1920,
+) -> None:
+    source = Path(source_path)
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if media_type == "image":
+        command = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-i", str(source),
+            "-t", f"{duration:.3f}", "-vf", _scale_filter(width, height), "-an", "-r", "30",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", str(target),
+        ]
     else:
-        # Crop top/bottom
-        new_h = int(w / target_ratio)
-        y_center = h / 2
-        clip = clip.crop(x1=0, y1=y_center - new_h/2, x2=w, y2=y_center + new_h/2)
-
-    return clip.resize((1080, 1920))
-
-def assemble_video(audio_path, word_timings, visual_data, output_path, music_dir="assets/music"):
-    logger.info("Starting deterministic video assembly...")
-    if not visual_data:
-        raise ValueError("No visuals provided for assembly.")
-    if not word_timings:
-        raise RuntimeError("No captions/word timings found; refusing to create uncaptained short.")
-
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    audio = AudioFileClip(audio_path)
-    source_duration = float(audio.duration)
-    max_duration = 58.0
-    total_duration = min(source_duration, max_duration)
-    if source_duration > max_duration:
-        logger.warning(f"Audio/video duration {source_duration:.2f}s exceeds {max_duration:.0f}s; trimming final output.")
-        audio = audio.subclip(0, total_duration)
-        word_timings = [w for w in word_timings if float(w.get("start", 0)) <= total_duration]
-
-    padding = 0.25
-    n = len(visual_data)
-    scene_duration = (total_duration + (n - 1) * padding) / n
-
-    logger.info(f"Narration duration: {total_duration:.2f}s")
-    logger.info(f"Scene count: {n}")
-    logger.info(f"Scene duration: {scene_duration:.2f}s")
-
-    visual_clips = []
-    temp_resized = []
-
-    for i, item in enumerate(visual_data):
-        path = item["path"]
-        mtype = item["type"]
-
-        if mtype == "video":
-            from moviepy.editor import VideoFileClip
-            clip = VideoFileClip(path).without_audio()
-            original_media_duration = clip.duration
-            # Strict logic: NEVER let a stock video clip truncate the total scene duration.
-            # If the video is shorter than the needed scene duration, we loop it.
-            if clip.duration < scene_duration:
-                # Import required here since it was missing at top level
-                from moviepy.editor import concatenate_videoclips
-                repeats = int(math.ceil(scene_duration / max(0.1, clip.duration)))
-                clip = concatenate_videoclips([clip] * repeats)
-
-            # Explicitly force the clip duration so MoviePy composition uses exact math
-            clip = clip.subclip(0, scene_duration).set_duration(scene_duration)
-            logger.info(f"Source media {i+1} duration: {original_media_duration:.2f}s -> adjusted/looped to {clip.duration:.2f}s")
-            clip = crop_video_to_vertical(clip)
+        source_duration = duration_seconds(source)
+        input_options: list[str]
+        if source_duration > duration + 0.5:
+            # Skip stock intros/outros and take a deterministic central subclip.
+            offset = max(0.0, (source_duration - duration) * 0.5)
+            input_options = ["-ss", f"{offset:.3f}", "-i", str(source)]
         else:
-            resized_path = resize_image_for_video(path)
-            temp_resized.append(resized_path)
-            clip = ImageClip(resized_path).set_duration(scene_duration)
-            logger.info(f"Source media {i+1} duration: image -> adjusted to {clip.duration:.2f}s")
-            clip = apply_ken_burns(clip, scene_index=i)
+            input_options = ["-stream_loop", "-1", "-i", str(source)]
+        command = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *input_options,
+            "-t", f"{duration:.3f}", "-vf", _scale_filter(width, height), "-an", "-r", "30",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", str(target),
+        ]
+    run_command(command)
+    actual = duration_seconds(target)
+    if abs(actual - duration) > 0.20:
+        raise RuntimeError(f"Prepared visual duration mismatch: expected {duration:.3f}s, got {actual:.3f}s")
 
-        if i > 0:
-            clip = clip.set_start(visual_clips[-1].end - padding).crossfadein(padding)
-        visual_clips.append(clip)
 
-    base = CompositeVideoClip(visual_clips, size=(W, H)).set_duration(total_duration)
-    caption_clips, chunks = _caption_overlay_clips(word_timings, total_duration=total_duration)
-    if not caption_clips:
-        raise RuntimeError("Caption overlay generation produced zero clips.")
+def _concat_segments(paths: list[Path], concat_path: Path, output_path: Path) -> None:
+    concat_path.write_text("".join(f"file '{path.resolve().as_posix()}'\n" for path in paths), encoding="utf-8")
+    run_command([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
+        "-i", str(concat_path), "-c", "copy", str(output_path),
+    ])
 
-    final_video = CompositeVideoClip([base] + caption_clips, size=(W, H)).set_duration(total_duration)
-    final_audio, music_meta = _add_music(audio, total_duration, music_dir)
-    final_video = final_video.set_audio(final_audio)
 
-    logger.info(f"Exporting final video to {output_path}")
-    final_video.write_videofile(
-        output_path,
-        fps=30,
-        codec="libx264",
-        audio_codec="aac",
-        bitrate="6500k",
-        preset="medium",
-        threads=4,
-    )
-
-    for p in temp_resized:
+def choose_music(music_dir: str | Path, mood: str = "neutral") -> tuple[Path | None, dict[str, Any] | None]:
+    directory = Path(music_dir)
+    metadata_path = directory / "music_library.json"
+    if not directory.exists():
+        return None, None
+    metadata = {}
+    if metadata_path.exists():
         try:
-            os.remove(p)
-        except Exception:
-            pass
-
-    # Save Metadata JSON
-    import json
-    metadata = {
-        "visuals": [{"source": v.get("source"), "author": v.get("author"), "type": v.get("type")} for v in visual_data],
-        "music": music_meta,
-        "caption_chunks": len(chunks),
-        "caption_words": len(word_timings),
-        "duration_seconds": total_duration,
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            metadata = {}
+    tracks = sorted([path for path in directory.iterdir() if path.suffix.lower() in {".mp3", ".wav", ".m4a"}])
+    if not tracks:
+        return None, None
+    preferred = [path for path in tracks if mood.lower() in str(metadata.get(path.name, {}).get("mood", "")).lower()]
+    track = (preferred or tracks)[0]
+    info = metadata.get(track.name, {})
+    return track, {
+        "path": str(track), "title": info.get("title", track.stem), "source": info.get("source", "local licensed track"),
+        "license": info.get("license", "User is responsible for confirming the committed track licence"), "mood": info.get("mood", mood),
     }
-    with open("output/metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2)
 
-    logger.info(f"Video assembly complete: {output_path}")
-    return output_path
+
+def assemble_video(
+    narration_path: str | Path,
+    scenes: list[dict[str, Any]],
+    selected_visuals: list[dict[str, Any]],
+    captions_ass_path: str | Path,
+    output_path: str | Path,
+    work_dir: str | Path,
+    music_dir: str | Path = "assets/music",
+    mood: str = "neutral",
+    width: int = 1080,
+    height: int = 1920,
+    scene_durations: list[float] | None = None,
+) -> tuple[float, dict[str, Any] | None]:
+    if len(selected_visuals) != len(scenes):
+        raise ValueError("Selected visual count must match scene count")
+    work = Path(work_dir)
+    work.mkdir(parents=True, exist_ok=True)
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    narration_duration = duration_seconds(narration_path)
+    if narration_duration <= 0:
+        raise RuntimeError("Narration has no measurable duration")
+    durations = scene_durations or allocate_scene_durations(scenes, narration_duration)
+    if len(durations) != len(scenes) or abs(sum(durations) - narration_duration) > 0.10:
+        raise ValueError("Scene durations must match scene count and canonical narration duration")
+    segment_paths: list[Path] = []
+    for index, (visual, duration) in enumerate(zip(selected_visuals, durations)):
+        segment_path = work / f"segment_{index:02d}.mp4"
+        prepare_visual_segment(visual["path"], visual["media_type"], duration, segment_path, width, height)
+        segment_paths.append(segment_path)
+    visuals_concat = work / "visuals_concat.mp4"
+    _concat_segments(segment_paths, work / "concat.txt", visuals_concat)
+
+    music_path, music_meta = choose_music(music_dir, mood)
+    ass = str(Path(captions_ass_path).resolve()).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    video_filter = f"subtitles='{ass}'"
+    command = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(visuals_concat), "-i", str(narration_path),
+    ]
+    if music_path:
+        command += ["-stream_loop", "-1", "-i", str(music_path)]
+        fade_out_start = max(0.0, narration_duration - 1.2)
+        filter_complex = (
+            f"[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[voice];"
+            f"[2:a]volume=0.075,afade=t=in:st=0:d=0.8,afade=t=out:st={fade_out_start:.3f}:d=1.0[music];"
+            f"[voice][music]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+        )
+    else:
+        filter_complex = "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
+    command += ["-filter_complex", filter_complex, "-map", "0:v:0", "-map", "[aout]"]
+    command += [
+        "-vf", video_filter, "-t", f"{narration_duration:.3f}", "-r", "30", "-c:v", "libx264",
+        "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+        "-movflags", "+faststart", "-shortest", str(output),
+    ]
+    run_command(command)
+    final_duration = duration_seconds(output)
+    if abs(final_duration - narration_duration) > 0.30:
+        raise RuntimeError(f"Final duration differs from narration by {abs(final_duration - narration_duration):.3f}s")
+    return final_duration, music_meta
+
+
+def smoke_render(output_path: str | Path, duration: float = 3.0, width: int = 360, height: int = 640) -> dict[str, Any]:
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    run_command([
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", f"color=c=0x223344:s={width}x{height}:r=30:d={duration}",
+        "-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=44100:duration={duration}",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", "-movflags", "+faststart", str(target),
+    ])
+    data = ffprobe(target)
+    video = next(row for row in data["streams"] if row.get("codec_type") == "video")
+    audio = next(row for row in data["streams"] if row.get("codec_type") == "audio")
+    return {
+        "path": str(target), "duration": float(data["format"]["duration"]),
+        "width": int(video["width"]), "height": int(video["height"]),
+        "video_codec": video["codec_name"], "audio_codec": audio["codec_name"],
+    }

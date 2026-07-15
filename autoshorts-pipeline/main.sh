@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-python src/main.py "$@"
+set -euo pipefail
+cd "$(dirname "$0")"
+exec python -m src.main "$@"
