@@ -1,4 +1,9 @@
-from src.subtitles import WordTiming, align_script_to_whisper, create_caption_chunks
+from src.subtitles import (
+    WordTiming,
+    _max_active_speech_caption_gap,
+    align_script_to_whisper,
+    create_caption_chunks,
+)
 
 
 def test_forced_alignment_reaches_full_script_coverage():
@@ -66,3 +71,27 @@ def test_common_number_forms_align_to_spoken_words():
     words, report = align_script_to_whisper(script, whisper, 1.8)
     assert report["raw_coverage_ratio"] == 1.0
     assert [word.normalized for word in words][3:5] == ["one", "thousand"]
+
+
+def test_long_pause_splits_caption_instead_of_cutting_through_speech():
+    words = [
+        WordTiming("Imagine", "imagine", 0.00, 0.30, "whisper", True),
+        WordTiming("Earth", "earth", 2.00, 2.58, "whisper", True),
+        WordTiming("stopping", "stopping", 2.60, 3.05, "whisper", True),
+    ]
+    chunks = create_caption_chunks(words, 3.4)
+    assert len(chunks[0].words) == 1
+    assert chunks[1].start == 2.0
+    assert _max_active_speech_caption_gap(words, chunks) <= 0.001
+
+
+def test_every_spoken_word_overlaps_a_caption_after_temporal_grouping():
+    words = [
+        WordTiming("word0", "word0", 0.00, 0.25, "whisper", True),
+        WordTiming("word1", "word1", 0.30, 0.62, "whisper", True),
+        WordTiming("word2", "word2", 1.95, 2.45, "whisper", True),
+        WordTiming("word3", "word3", 2.48, 2.85, "whisper", True),
+    ]
+    chunks = create_caption_chunks(words, 3.2)
+    assert _max_active_speech_caption_gap(words, chunks) <= 0.001
+    assert all(chunk.end - chunk.start <= 1.8 + 0.001 for chunk in chunks)

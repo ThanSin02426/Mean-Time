@@ -193,32 +193,66 @@ def align_script_to_whisper(script: str, whisper_words: Iterable[dict[str, Any]]
     return output, report
 
 
-def _group_words(words: list[WordTiming], min_words: int, max_words: int) -> list[list[WordTiming]]:
+def _group_fits(rows: list[WordTiming], max_duration: float = 1.8, end_padding: float = 0.14) -> bool:
+    if not rows:
+        return True
+    return max(rows[-1].end + end_padding, rows[0].start + 0.35) - rows[0].start <= max_duration + 1e-6
+
+
+def _group_words(
+    words: list[WordTiming],
+    min_words: int,
+    max_words: int,
+    max_duration: float = 1.8,
+    max_inter_word_silence: float = 0.35,
+) -> list[list[WordTiming]]:
+    """Create readable caption groups without cutting through spoken words.
+
+    The 2–4 word rule is a preference, not permission to bridge a long pause or
+    truncate the final spoken word. A one-word chunk is therefore allowed when
+    timing requires it.
+    """
     groups: list[list[WordTiming]] = []
     current: list[WordTiming] = []
+
     for word in words:
-        if current and len(current) >= min_words and word.end - current[0].start > 1.66:
-            groups.append(current)
-            current = []
+        if current:
+            silence = max(0.0, word.start - current[-1].end)
+            projected = [*current, word]
+            if silence > max_inter_word_silence or not _group_fits(projected, max_duration):
+                groups.append(current)
+                current = []
+
         current.append(word)
         punctuation_break = bool(re.search(r"[.!?,;:]$", word.word))
         if len(current) >= max_words or (len(current) >= min_words and punctuation_break):
             groups.append(current)
             current = []
+
     if current:
         groups.append(current)
+
+    # Prefer 2–4 words, but merge a trailing singleton only when timing remains safe.
     if len(groups) >= 2 and len(groups[-1]) == 1:
-        if len(groups[-2]) > min_words:
-            groups[-1].insert(0, groups[-2].pop())
-        elif len(groups[-2]) + 1 <= max_words:
-            groups[-2].extend(groups.pop())
+        merged = [*groups[-2], *groups[-1]]
+        if len(merged) <= max_words and _group_fits(merged, max_duration):
+            groups[-2:] = [merged]
+
     return groups
 
 
 def _build_chunk(rows: list[WordTiming], duration: float) -> CaptionChunk:
     start = max(0.0, rows[0].start)
-    natural_end = min(duration, rows[-1].end + 0.14)
-    end = min(start + 1.8, max(natural_end, start + 0.35), duration)
+    required_end = max(rows[-1].end + 0.14, start + 0.35)
+    # Groups are formed to fit within 1.8s. Never cut through a spoken word if
+    # rounding or a pathological timestamp still makes the span slightly longer.
+    end = min(duration, required_end)
+    if end - start > 1.8 + 1e-6:
+        logger.warning(
+            "Caption group exceeds 1.8s without a safe split: %.3fs (%s)",
+            end - start,
+            " ".join(row.word for row in rows),
+        )
     return CaptionChunk(
         text=" ".join(row.word for row in rows),
         start=round(start, 3),
@@ -241,7 +275,6 @@ def create_caption_chunks(words: list[WordTiming], audio_duration: float, min_wo
                 current.end = round(following.start, 3)
     chunks[-1].end = min(chunks[-1].end, round(audio_duration, 3))
     return chunks
-
 
 def _ass_time(seconds: float) -> str:
     seconds = max(0.0, seconds)
@@ -283,17 +316,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 def _max_active_speech_caption_gap(words: list[WordTiming], chunks: list[CaptionChunk]) -> float:
+    """Return the largest uncovered interval inside any spoken-word timestamp."""
     largest = 0.0
     for word in words:
-        overlaps = [chunk for chunk in chunks if chunk.end > word.start and chunk.start < word.end]
-        if not overlaps:
+        intervals: list[tuple[float, float]] = []
+        for chunk in chunks:
+            start = max(word.start, chunk.start)
+            end = min(word.end, chunk.end)
+            if end > start:
+                intervals.append((start, end))
+
+        if not intervals:
             largest = max(largest, max(0.0, word.end - word.start))
             continue
-        covered_start = min(chunk.start for chunk in overlaps)
-        covered_end = max(chunk.end for chunk in overlaps)
-        largest = max(largest, max(0.0, covered_start - word.start), max(0.0, word.end - covered_end))
-    return largest
 
+        intervals.sort()
+        cursor = word.start
+        for start, end in intervals:
+            if start > cursor:
+                largest = max(largest, start - cursor)
+            cursor = max(cursor, end)
+        if cursor < word.end:
+            largest = max(largest, word.end - cursor)
+    return largest
 
 def transcribe_and_align(
     audio_path: str | Path,

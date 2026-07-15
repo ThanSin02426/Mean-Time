@@ -33,19 +33,19 @@ jobs:
         working-directory: autoshorts-pipeline
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: autoshorts-pipeline/requirements.txt
 
       - name: Cache Whisper models
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/huggingface
@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload review or recovery artifact
         if: always() && (steps.mode.outputs.publish != 'true' || failure() || steps.queue_push.outputs.status == 'failed')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: autoshorts-${{ github.run_number }}-${{ github.run_attempt }}
           if-no-files-found: error
@@ -221,6 +221,10 @@ jobs:
           print(f"- Niche: `{data.get('niche')}`")
           print(f"- Narration: {data.get('narration_word_count')} words / {data.get('narration_duration')} seconds")
           print(f"- Final duration: {data.get('final_duration')} seconds")
+          subtitle = data.get('subtitle_alignment_results', {})
+          print(f"- Subtitle raw coverage: {subtitle.get('raw_coverage_ratio', 'n/a')}")
+          print(f"- Subtitle final alignment: {subtitle.get('final_alignment_ratio', 'n/a')}")
+          print(f"- Maximum active-speech caption gap: {subtitle.get('maximum_active_speech_caption_gap', 'n/a')} seconds")
           print(f"- Upload status: `{data.get('upload_status')}`")
           print(f"- YouTube URL: {data.get('youtube_url') or 'not uploaded'}")
           tx = data.get('queue_transaction_status', {})
