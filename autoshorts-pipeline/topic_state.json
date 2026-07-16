@@ -2,15 +2,18 @@
   "version": 2,
   "recent_niches": [
     "space",
-    "ocean"
+    "ocean",
+    "animals"
   ],
   "recent_replacement_niches": [
     "animals",
-    "ocean"
+    "ocean",
+    "psychology"
   ],
   "used_topics": [
     "What would happen if Earth stopped spinning for one second",
-    "How deep sea animals survive crushing pressure"
+    "How deep sea animals survive crushing pressure",
+    "Animals that can survive being frozen"
   ],
   "events": [
     {
@@ -28,6 +31,14 @@
       "replacement_topic": "Why coral reefs support so many species",
       "replacement_niche": "ocean",
       "finalized_at": "2026-07-16T15:30:48.143720+00:00"
+    },
+    {
+      "transaction_id": "a113176aae8d45d7a2b0f9e179e26c8c",
+      "selected_topic": "Animals that can survive being frozen",
+      "selected_niche": "animals",
+      "replacement_topic": "Why choices feel harder when options multiply",
+      "replacement_niche": "psychology",
+      "finalized_at": "2026-07-16T18:36:38.071931+00:00"
     }
   ]
 }
