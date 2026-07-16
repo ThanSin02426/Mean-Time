@@ -2,6 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from PIL import Image, ImageChops, ImageDraw
+
 from src.audio_utils import duration_seconds, ffprobe
 from src.quality_gates import run_quality_gates
 from src.video_assembly import prepare_visual_segment, smoke_render
@@ -16,6 +18,32 @@ def test_stock_clip_is_looped_to_scene_duration(tmp_path):
     ], check=True)
     prepare_visual_segment(source, "video", 1.8, target, 360, 640)
     assert abs(duration_seconds(target) - 1.8) < 0.2
+
+
+def test_static_image_gets_subtle_zoom_motion(tmp_path):
+    source = tmp_path / "source.jpg"
+    target = tmp_path / "target.mp4"
+    first_frame = tmp_path / "first.png"
+    last_frame = tmp_path / "last.png"
+
+    image = Image.new("RGB", (720, 1280), (20, 30, 45))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((80, 100, 640, 1180), outline=(240, 220, 80), width=18)
+    draw.ellipse((230, 470, 490, 730), fill=(180, 50, 80))
+    image.save(source, quality=95)
+
+    prepare_visual_segment(source, "image", 2.0, target, 360, 640)
+    assert abs(duration_seconds(target) - 2.0) < 0.2
+
+    for timestamp, output in ((0.05, first_frame), (1.85, last_frame)):
+        subprocess.run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-ss", str(timestamp), "-i", str(target), "-frames:v", "1", str(output),
+        ], check=True)
+
+    with Image.open(first_frame) as first, Image.open(last_frame) as last:
+        difference = ImageChops.difference(first.convert("RGB"), last.convert("RGB"))
+        assert difference.getbbox() is not None
 
 
 def test_smoke_render_and_ffprobe_validation(tmp_path):

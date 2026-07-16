@@ -58,6 +58,36 @@ def _scale_filter(width: int, height: int) -> str:
     )
 
 
+def _image_motion_filter(
+    width: int,
+    height: int,
+    duration: float,
+    motion_variant: int = 0,
+) -> str:
+    """Create a subtle deterministic Ken Burns zoom for still-image scenes."""
+    fps = 30
+    frame_count = max(2, int(round(duration * fps)))
+    denominator = max(1, frame_count - 1)
+
+    # Overscan before zooming so the motion never reveals empty borders.
+    overscan = 1.12
+    scaled_width = int(width * overscan + 1) // 2 * 2
+    scaled_height = int(height * overscan + 1) // 2 * 2
+
+    if motion_variant % 2 == 0:
+        zoom = f"1.0+0.08*min(on/{denominator},1)"
+    else:
+        zoom = f"1.08-0.08*min(on/{denominator},1)"
+
+    return (
+        f"scale={scaled_width}:{scaled_height}:force_original_aspect_ratio=increase,"
+        f"crop={scaled_width}:{scaled_height},"
+        f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d=1:s={width}x{height}:fps={fps},"
+        "setsar=1,format=yuv420p"
+    )
+
+
 def prepare_visual_segment(
     source_path: str | Path,
     media_type: str,
@@ -65,15 +95,19 @@ def prepare_visual_segment(
     output_path: str | Path,
     width: int = 1080,
     height: int = 1920,
+    motion_variant: int = 0,
 ) -> None:
     source = Path(source_path)
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
     if media_type == "image":
         command = [
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-i", str(source),
-            "-t", f"{duration:.3f}", "-vf", _scale_filter(width, height), "-an", "-r", "30",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", str(target),
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-loop", "1", "-framerate", "30", "-i", str(source),
+            "-t", f"{duration:.3f}",
+            "-vf", _image_motion_filter(width, height, duration, motion_variant),
+            "-an", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+            "-pix_fmt", "yuv420p", str(target),
         ]
     else:
         source_duration = duration_seconds(source)
@@ -154,7 +188,10 @@ def assemble_video(
     segment_paths: list[Path] = []
     for index, (visual, duration) in enumerate(zip(selected_visuals, durations)):
         segment_path = work / f"segment_{index:02d}.mp4"
-        prepare_visual_segment(visual["path"], visual["media_type"], duration, segment_path, width, height)
+        prepare_visual_segment(
+            visual["path"], visual["media_type"], duration, segment_path, width, height,
+            motion_variant=index,
+        )
         segment_paths.append(segment_path)
     visuals_concat = work / "visuals_concat.mp4"
     _concat_segments(segment_paths, work / "concat.txt", visuals_concat)
