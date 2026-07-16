@@ -3,17 +3,20 @@
   "recent_niches": [
     "space",
     "ocean",
-    "animals"
+    "animals",
+    "ancient_history"
   ],
   "recent_replacement_niches": [
     "animals",
     "ocean",
-    "psychology"
+    "psychology",
+    "human_body"
   ],
   "used_topics": [
     "What would happen if Earth stopped spinning for one second",
     "How deep sea animals survive crushing pressure",
-    "Animals that can survive being frozen"
+    "Animals that can survive being frozen",
+    "How ancient Romans made concrete that heals itself"
   ],
   "events": [
     {
@@ -39,6 +42,14 @@
       "replacement_topic": "Why choices feel harder when options multiply",
       "replacement_niche": "psychology",
       "finalized_at": "2026-07-16T18:36:38.071931+00:00"
+    },
+    {
+      "transaction_id": "8f0ca1d475814c43bb1e95cf3e6da2cf",
+      "selected_topic": "How ancient Romans made concrete that heals itself",
+      "selected_niche": "ancient_history",
+      "replacement_topic": "How your inner ear keeps you balanced",
+      "replacement_niche": "human_body",
+      "finalized_at": "2026-07-16T19:01:22.902052+00:00"
     }
   ]
 }
