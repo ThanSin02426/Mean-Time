@@ -1,13 +1,16 @@
 {
   "version": 2,
   "recent_niches": [
-    "space"
+    "space",
+    "ocean"
   ],
   "recent_replacement_niches": [
-    "animals"
+    "animals",
+    "ocean"
   ],
   "used_topics": [
-    "What would happen if Earth stopped spinning for one second"
+    "What would happen if Earth stopped spinning for one second",
+    "How deep sea animals survive crushing pressure"
   ],
   "events": [
     {
@@ -17,6 +20,14 @@
       "replacement_topic": "Why crows can remember human faces",
       "replacement_niche": "animals",
       "finalized_at": "2026-07-15T18:10:15.345978+00:00"
+    },
+    {
+      "transaction_id": "9ebd954ed06f47db8107db33aad19fd4",
+      "selected_topic": "How deep sea animals survive crushing pressure",
+      "selected_niche": "ocean",
+      "replacement_topic": "Why coral reefs support so many species",
+      "replacement_niche": "ocean",
+      "finalized_at": "2026-07-16T15:30:48.143720+00:00"
     }
   ]
 }
