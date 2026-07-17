@@ -4,19 +4,22 @@
     "space",
     "ocean",
     "animals",
-    "ancient_history"
+    "ancient_history",
+    "human_body"
   ],
   "recent_replacement_niches": [
     "animals",
     "ocean",
     "psychology",
-    "human_body"
+    "human_body",
+    "ancient_history"
   ],
   "used_topics": [
     "What would happen if Earth stopped spinning for one second",
     "How deep sea animals survive crushing pressure",
     "Animals that can survive being frozen",
-    "How ancient Romans made concrete that heals itself"
+    "How ancient Romans made concrete that heals itself",
+    "Why your stomach does not digest itself"
   ],
   "events": [
     {
@@ -50,6 +53,14 @@
       "replacement_topic": "How your inner ear keeps you balanced",
       "replacement_niche": "human_body",
       "finalized_at": "2026-07-16T19:01:22.902052+00:00"
+    },
+    {
+      "transaction_id": "bdfc27b7fcc94834a6bc689394766266",
+      "selected_topic": "Why your stomach does not digest itself",
+      "selected_niche": "human_body",
+      "replacement_topic": "How the Inca built roads across mountains",
+      "replacement_niche": "ancient_history",
+      "finalized_at": "2026-07-17T15:09:58.543792+00:00"
     }
   ]
 }
