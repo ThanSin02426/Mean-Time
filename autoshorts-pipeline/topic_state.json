@@ -5,21 +5,24 @@
     "ocean",
     "animals",
     "ancient_history",
-    "human_body"
+    "human_body",
+    "psychology"
   ],
   "recent_replacement_niches": [
     "animals",
     "ocean",
     "psychology",
     "human_body",
-    "ancient_history"
+    "ancient_history",
+    "extreme_places"
   ],
   "used_topics": [
     "What would happen if Earth stopped spinning for one second",
     "How deep sea animals survive crushing pressure",
     "Animals that can survive being frozen",
     "How ancient Romans made concrete that heals itself",
-    "Why your stomach does not digest itself"
+    "Why your stomach does not digest itself",
+    "Why unfinished tasks stay stuck in your mind"
   ],
   "events": [
     {
@@ -61,6 +64,14 @@
       "replacement_topic": "How the Inca built roads across mountains",
       "replacement_niche": "ancient_history",
       "finalized_at": "2026-07-17T15:09:58.543792+00:00"
+    },
+    {
+      "transaction_id": "e9663edd0a494d389896a2a06d284d38",
+      "selected_topic": "Why unfinished tasks stay stuck in your mind",
+      "selected_niche": "psychology",
+      "replacement_topic": "Why high altitude deserts are used to test Mars equipment",
+      "replacement_niche": "extreme_places",
+      "finalized_at": "2026-07-18T14:47:37.711222+00:00"
     }
   ]
 }
