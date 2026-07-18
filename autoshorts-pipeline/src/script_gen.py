@@ -15,7 +15,8 @@ from .topic_engine import NICHES, QueueManager
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You create factual, high-retention English YouTube Shorts scripts.
+SYSTEM_PROMPT = """You create factual, high-retention English YouTube Shorts scripts for a channel that is permanently focused on space.
+Every topic, title, claim, visual, description, and tag must relate directly to astronomy, cosmology, planetary science, spaceflight, astronauts, space telescopes, or space technology. The niche field must always be "space". Never drift into psychology, animals, general history, medicine, ocean facts, or unrelated Earth science.
 Return JSON only. Do not invent, guess, or write source URLs. Set every scene's sources field to an empty list; verified URLs are attached later from structured Google Search grounding metadata or the verified source cache.
 The narration must be 85-115 spoken words, 35-50 seconds, hard maximum 58 seconds.
 Use 4-6 scenes. The first sentence must hook within two seconds. One claim per scene.
@@ -111,9 +112,11 @@ def validate_script(data: dict[str, Any], topic: str, history_path: str | Path) 
     data["narration"] = narration
     data["narration_word_count"] = count
     data["topic"] = topic
-    data["niche"] = str(data.get("niche") or QueueManager.categorize(topic))
-    if data["niche"] not in NICHES:
-        raise ValueError(f"Unknown niche: {data['niche']}")
+    if not QueueManager.is_space_topic(topic):
+        raise ValueError("The channel accepts only space-oriented topics")
+    # The model is not allowed to relabel the channel. Keep the public niche fixed
+    # so visuals always use the NASA-first space provider order.
+    data["niche"] = "space"
     count_match = re.search(r"\b(\d+)\b", title)
     if count_match and int(count_match.group(1)) != len(scenes):
         raise ValueError("Numeric title count does not match the number of scenes")

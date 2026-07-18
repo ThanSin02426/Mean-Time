@@ -1,482 +1,626 @@
 [
   {
-    "topic": "What would happen if Earth stopped spinning for one second",
+    "topic": "How a black hole bends light into a glowing ring",
     "niche": "space",
+    "theme": "black_holes",
     "proven": true
   },
   {
-    "topic": "Why neutron stars are the densest visible objects",
+    "topic": "Why time runs slower near a black hole",
     "niche": "space",
+    "theme": "black_holes",
     "proven": true
   },
   {
-    "topic": "The coldest known place in the universe",
+    "topic": "What the event horizon of a black hole actually means",
     "niche": "space",
+    "theme": "black_holes",
     "proven": true
   },
   {
-    "topic": "How astronauts sleep without falling down",
+    "topic": "How astronomers photographed a black hole shadow",
     "niche": "space",
+    "theme": "black_holes",
     "proven": true
   },
   {
-    "topic": "The strange weather found on distant planets",
+    "topic": "Why black holes can launch enormous jets",
     "niche": "space",
+    "theme": "black_holes",
+    "proven": true
+  },
+  {
+    "topic": "How merging black holes create gravitational waves",
+    "niche": "space",
+    "theme": "black_holes",
+    "proven": true
+  },
+  {
+    "topic": "Could a black hole wander through the Milky Way",
+    "niche": "space",
+    "theme": "black_holes",
     "proven": false
   },
   {
-    "topic": "Why space can smell like hot metal",
+    "topic": "What an astronaut would see while approaching a black hole",
     "niche": "space",
+    "theme": "black_holes",
     "proven": false
   },
   {
-    "topic": "How black holes bend the path of light",
+    "topic": "Why neutron stars are so incredibly dense",
     "niche": "space",
+    "theme": "stars",
     "proven": true
+  },
+  {
+    "topic": "How pulsars act like cosmic clocks",
+    "niche": "space",
+    "theme": "stars",
+    "proven": true
+  },
+  {
+    "topic": "How stars turn hydrogen into light",
+    "niche": "space",
+    "theme": "stars",
+    "proven": true
+  },
+  {
+    "topic": "Why red giant stars swell to enormous sizes",
+    "niche": "space",
+    "theme": "stars",
+    "proven": true
+  },
+  {
+    "topic": "What causes a massive star to explode as a supernova",
+    "niche": "space",
+    "theme": "stars",
+    "proven": true
+  },
+  {
+    "topic": "Why Sun-like stars end as white dwarfs",
+    "niche": "space",
+    "theme": "stars",
+    "proven": true
+  },
+  {
+    "topic": "How magnetars create extreme magnetic fields",
+    "niche": "space",
+    "theme": "stars",
+    "proven": false
+  },
+  {
+    "topic": "What brown dwarfs reveal about failed stars",
+    "niche": "space",
+    "theme": "stars",
+    "proven": false
+  },
+  {
+    "topic": "Why Venus is hotter than Mercury",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "Why Uranus rotates on its side",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "How Jupiters Great Red Spot survives for centuries",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "Why Saturns rings are incredibly thin",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "How Jupiters moon Io became so volcanic",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "Why Europa may hide a global ocean",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "How Pluto developed a blue atmospheric haze",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": true
+  },
+  {
+    "topic": "Why Mercury has ice inside permanently shadowed craters",
+    "niche": "space",
+    "theme": "solar_system",
+    "proven": false
   },
   {
     "topic": "Why sunsets on Mars appear blue",
     "niche": "space",
+    "theme": "mars",
     "proven": true
   },
   {
-    "topic": "How deep sea animals survive crushing pressure",
-    "niche": "ocean",
+    "topic": "How dust storms can cover nearly all of Mars",
+    "niche": "space",
+    "theme": "mars",
     "proven": true
   },
   {
-    "topic": "Why the ocean has underwater lakes",
-    "niche": "ocean",
+    "topic": "Why Mars lost most of its ancient atmosphere",
+    "niche": "space",
+    "theme": "mars",
     "proven": true
   },
   {
-    "topic": "The loudest animal sound in the ocean",
-    "niche": "ocean",
+    "topic": "How Mars rovers navigate without GPS",
+    "niche": "space",
+    "theme": "mars",
     "proven": true
   },
   {
-    "topic": "How hydrothermal vents support life without sunlight",
-    "niche": "ocean",
+    "topic": "Why Olympus Mons became the tallest volcano in the solar system",
+    "niche": "space",
+    "theme": "mars",
     "proven": true
   },
   {
-    "topic": "The mysterious daily migration beneath the ocean surface",
-    "niche": "ocean",
+    "topic": "How seasons work differently on Mars",
+    "niche": "space",
+    "theme": "mars",
+    "proven": true
+  },
+  {
+    "topic": "How Perseverance stores samples for a future return mission",
+    "niche": "space",
+    "theme": "mars",
     "proven": false
   },
   {
-    "topic": "Why some ocean waves glow blue at night",
-    "niche": "ocean",
+    "topic": "What ancient Martian river deltas reveal about past water",
+    "niche": "space",
+    "theme": "mars",
     "proven": false
   },
   {
-    "topic": "How whales communicate across huge distances",
-    "niche": "ocean",
+    "topic": "Why the Moon always shows Earth the same face",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "Why coral reefs support so many species",
-    "niche": "ocean",
+    "topic": "How moonquakes happen on a geologically quiet world",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "Animals that can survive being frozen",
-    "niche": "animals",
+    "topic": "Why lunar dust is dangerous to astronauts",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "How octopuses solve complex problems",
-    "niche": "animals",
+    "topic": "How the Moon helps stabilize Earths tilt",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "Why crows can remember human faces",
-    "niche": "animals",
+    "topic": "What created the dark lunar maria",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "The fastest biological movement in nature",
-    "niche": "animals",
+    "topic": "Why permanently shadowed lunar craters may contain ice",
+    "niche": "space",
+    "theme": "moon",
     "proven": true
   },
   {
-    "topic": "How tiny animals navigate using Earths magnetic field",
-    "niche": "animals",
+    "topic": "How Apollo astronauts moved in low gravity",
+    "niche": "space",
+    "theme": "moon",
     "proven": false
   },
   {
-    "topic": "The animal that can rebuild most of its body",
-    "niche": "animals",
+    "topic": "Why the Moon is slowly moving away from Earth",
+    "niche": "space",
+    "theme": "moon",
     "proven": false
   },
   {
-    "topic": "How geckos walk across ceilings",
-    "niche": "animals",
+    "topic": "How astronomers detect planets by watching stars dim",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "Why owls can fly almost silently",
-    "niche": "animals",
+    "topic": "What makes a hot Jupiter so extreme",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "How ancient Romans made concrete that heals itself",
-    "niche": "ancient_history",
+    "topic": "How scientists study the atmospheres of distant planets",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "The engineering secrets of the Great Pyramid",
-    "niche": "ancient_history",
+    "topic": "What makes an exoplanet potentially habitable",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "How ancient cities moved water without electricity",
-    "niche": "ancient_history",
+    "topic": "Why rogue planets travel through space without stars",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "The oldest known written customer complaint",
-    "niche": "ancient_history",
+    "topic": "How tidal locking changes an alien world",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": true
   },
   {
-    "topic": "Lost pigments used by ancient artists",
-    "niche": "ancient_history",
+    "topic": "What super Earths may be made of",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": false
   },
   {
-    "topic": "How ancient navigators crossed oceans without maps",
-    "niche": "ancient_history",
+    "topic": "Could some exoplanets rain glass sideways",
+    "niche": "space",
+    "theme": "exoplanets",
     "proven": false
   },
   {
-    "topic": "How the Inca built roads across mountains",
-    "niche": "ancient_history",
+    "topic": "How the Milky Ways spiral arms are formed",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "Why ancient glass can survive for centuries",
-    "niche": "ancient_history",
+    "topic": "What really happens when two galaxies collide",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "Why your stomach does not digest itself",
-    "niche": "human_body",
+    "topic": "Why galaxies appear to sit inside dark matter halos",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "How the human body repairs broken bones",
-    "niche": "human_body",
+    "topic": "How the Andromeda galaxy is approaching the Milky Way",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "Why fingerprints improve grip",
-    "niche": "human_body",
+    "topic": "Why some galaxies suddenly stop forming stars",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "What causes the feeling of pins and needles",
-    "niche": "human_body",
+    "topic": "How quasars can outshine entire galaxies",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": true
   },
   {
-    "topic": "How the brain predicts what you will see next",
-    "niche": "human_body",
+    "topic": "What lies at the center of the Milky Way",
+    "niche": "space",
+    "theme": "galaxies",
+    "proven": true
+  },
+  {
+    "topic": "How astronomers map gas that human eyes cannot see",
+    "niche": "space",
+    "theme": "galaxies",
     "proven": false
   },
   {
-    "topic": "Why humans produce different kinds of tears",
-    "niche": "human_body",
+    "topic": "How astronomers measure the expansion of the universe",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "What the cosmic microwave background actually is",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "Why distant galaxies appear redshifted",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "What scientists mean by dark energy",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "How the early universe formed its first atoms",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "Why the observable universe has a horizon",
+    "niche": "space",
+    "theme": "cosmology",
+    "proven": true
+  },
+  {
+    "topic": "What cosmic inflation tries to explain",
+    "niche": "space",
+    "theme": "cosmology",
     "proven": false
   },
   {
-    "topic": "How your inner ear keeps you balanced",
-    "niche": "human_body",
-    "proven": true
-  },
-  {
-    "topic": "Why muscles shake during intense effort",
-    "niche": "human_body",
-    "proven": true
-  },
-  {
-    "topic": "Why unfinished tasks stay stuck in your mind",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "How expectation changes what food tastes like",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "Why time feels faster as routines repeat",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "How crowds change individual decisions",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "The psychology behind false familiarity",
-    "niche": "psychology",
+    "topic": "How scientists estimate the age of the universe",
+    "niche": "space",
+    "theme": "cosmology",
     "proven": false
   },
   {
-    "topic": "Why silence can feel longer than it is",
-    "niche": "psychology",
+    "topic": "What makes an asteroid different from a comet",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "How NASAs DART mission changed an asteroids orbit",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "Why comets grow bright tails near the Sun",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "How meteorites reveal the history of the solar system",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "What caused the Chelyabinsk meteor shock wave",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "Why samples from asteroid Bennu matter",
+    "niche": "space",
+    "theme": "asteroids_comets",
+    "proven": true
+  },
+  {
+    "topic": "How astronomers track near Earth objects",
+    "niche": "space",
+    "theme": "asteroids_comets",
     "proven": false
   },
   {
-    "topic": "Why choices feel harder when options multiply",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "How sleep strengthens new memories",
-    "niche": "psychology",
-    "proven": true
-  },
-  {
-    "topic": "Materials that get thicker when hit",
-    "niche": "strange_science",
-    "proven": true
-  },
-  {
-    "topic": "How water can boil and freeze at the same time",
-    "niche": "strange_science",
-    "proven": true
-  },
-  {
-    "topic": "Why some metals remember their original shape",
-    "niche": "strange_science",
-    "proven": true
-  },
-  {
-    "topic": "The experiment that makes sound visible",
-    "niche": "strange_science",
-    "proven": true
-  },
-  {
-    "topic": "How light can push microscopic objects",
-    "niche": "strange_science",
+    "topic": "What metal rich asteroids could reveal about planet formation",
+    "niche": "space",
+    "theme": "asteroids_comets",
     "proven": false
   },
   {
-    "topic": "Why hot water can sometimes freeze first",
-    "niche": "strange_science",
+    "topic": "How reusable rockets land after launch",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "Why rockets use multiple stages",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "How spacecraft steal speed using gravity assists",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "How astronauts dock two spacecraft in orbit",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "Why interplanetary launch windows matter",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "How heat shields survive atmospheric reentry",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "How ion thrusters accelerate spacecraft for years",
+    "niche": "space",
+    "theme": "spaceflight",
+    "proven": true
+  },
+  {
+    "topic": "Why satellites need regular course corrections",
+    "niche": "space",
+    "theme": "spaceflight",
     "proven": false
   },
   {
-    "topic": "How magnetic levitation can suspend objects",
-    "niche": "strange_science",
+    "topic": "How the James Webb Space Telescope sees infrared light",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "Why soap makes water spread differently",
-    "niche": "strange_science",
+    "topic": "Why the Hubble Space Telescope orbits above the atmosphere",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "The science behind unexplained humming sounds",
-    "niche": "mysteries",
+    "topic": "How radio telescopes see an invisible universe",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "Why some ancient maps seem unusually accurate",
-    "niche": "mysteries",
+    "topic": "How adaptive optics removes the twinkle of stars",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "The mystery of disappearing desert lakes",
-    "niche": "mysteries",
+    "topic": "Why giant telescope mirrors are built from segments",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "How investigators identify unknown shipwrecks",
-    "niche": "mysteries",
+    "topic": "How gravitational lensing works like a cosmic telescope",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": true
   },
   {
-    "topic": "The coded messages hidden in historic monuments",
-    "niche": "mysteries",
+    "topic": "How telescope interferometry creates a sharper image",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": false
   },
   {
-    "topic": "Why abandoned places can preserve sound clues",
-    "niche": "mysteries",
+    "topic": "How space telescopes detect chemicals in alien atmospheres",
+    "niche": "space",
+    "theme": "telescopes",
     "proven": false
   },
   {
-    "topic": "How scientists trace the origin of meteorites",
-    "niche": "mysteries",
+    "topic": "How astronauts sleep in microgravity",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "Why some radio signals remain unidentified",
-    "niche": "mysteries",
+    "topic": "Why muscles weaken during long space missions",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "How people live in the coldest inhabited town",
-    "niche": "extreme_places",
+    "topic": "How the International Space Station recycles water",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "The hottest naturally occurring ground temperatures",
-    "niche": "extreme_places",
+    "topic": "How spacesuits keep astronauts alive in a vacuum",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "Why high altitude deserts are used to test Mars equipment",
-    "niche": "extreme_places",
+    "topic": "Why astronauts sometimes see flashes with closed eyes",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "Life beside the worlds most active volcanoes",
-    "niche": "extreme_places",
+    "topic": "Why food can taste different in orbit",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": true
   },
   {
-    "topic": "The isolated caves with their own ecosystems",
-    "niche": "extreme_places",
+    "topic": "How astronauts exercise without normal gravity",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": false
   },
   {
-    "topic": "Why some deserts suddenly fill with flowers",
-    "niche": "extreme_places",
+    "topic": "What months in space do to human bones",
+    "niche": "space",
+    "theme": "human_spaceflight",
     "proven": false
   },
   {
-    "topic": "How life survives beneath Antarctic ice",
-    "niche": "extreme_places",
+    "topic": "How solar flares can affect technology on Earth",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "Why salt flats become giant natural mirrors",
-    "niche": "extreme_places",
+    "topic": "What creates the northern and southern lights",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "How quantum sensors can detect tiny changes",
-    "niche": "technology_future",
+    "topic": "How coronal mass ejections travel through space",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "Why solid state batteries could change electric vehicles",
-    "niche": "technology_future",
+    "topic": "Why satellites are vulnerable to space weather",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "How robots learn delicate hand movements",
-    "niche": "technology_future",
+    "topic": "How the solar wind shapes Earths magnetosphere",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "The technology behind reusable rockets",
-    "niche": "technology_future",
+    "topic": "What happened during the Carrington Event",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": true
   },
   {
-    "topic": "How digital twins predict machine failures",
-    "niche": "technology_future",
+    "topic": "How scientists forecast dangerous space weather",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": false
   },
   {
-    "topic": "The future of computing with light instead of electricity",
-    "niche": "technology_future",
+    "topic": "Why Mars has little protection from the solar wind",
+    "niche": "space",
+    "theme": "space_weather",
     "proven": false
-  },
-  {
-    "topic": "How heat pumps move more heat than their electricity input",
-    "niche": "technology_future",
-    "proven": true
-  },
-  {
-    "topic": "Why satellite internet needs moving constellations",
-    "niche": "technology_future",
-    "proven": true
-  },
-  {
-    "topic": "Why skyscrapers are designed to sway",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "How suspension bridges survive strong winds",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "The engineering that keeps tunnels dry",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "How aircraft wings bend without breaking",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "Why some buildings use giant moving weights",
-    "niche": "engineering",
-    "proven": false
-  },
-  {
-    "topic": "How engineers move entire historic structures",
-    "niche": "engineering",
-    "proven": false
-  },
-  {
-    "topic": "How earthquake isolators protect buildings",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "Why submarine hulls use rounded shapes",
-    "niche": "engineering",
-    "proven": true
-  },
-  {
-    "topic": "How fire rainbows form without fire",
-    "niche": "rare_natural_phenomena",
-    "proven": true
-  },
-  {
-    "topic": "Why ball lightning remains difficult to explain",
-    "niche": "rare_natural_phenomena",
-    "proven": true
-  },
-  {
-    "topic": "How frost flowers grow on sea ice",
-    "niche": "rare_natural_phenomena",
-    "proven": true
-  },
-  {
-    "topic": "Why volcanic lightning appears inside ash clouds",
-    "niche": "rare_natural_phenomena",
-    "proven": true
-  },
-  {
-    "topic": "The conditions that create moonbows",
-    "niche": "rare_natural_phenomena",
-    "proven": false
-  },
-  {
-    "topic": "How singing sand dunes produce deep notes",
-    "niche": "rare_natural_phenomena",
-    "proven": false
-  },
-  {
-    "topic": "Why ice circles rotate in slow rivers",
-    "niche": "rare_natural_phenomena",
-    "proven": true
-  },
-  {
-    "topic": "How lenticular clouds form over mountains",
-    "niche": "rare_natural_phenomena",
-    "proven": true
   }
 ]

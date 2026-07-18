@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import logging
 import random
+import re
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -15,152 +16,187 @@ from .models import utc_now
 
 logger = logging.getLogger(__name__)
 
-NICHES = (
-    "space", "ocean", "animals", "ancient_history", "human_body", "psychology",
-    "strange_science", "mysteries", "extreme_places", "technology_future",
-    "engineering", "rare_natural_phenomena",
-)
-NICHE_COOLDOWN = 8
+# The channel is intentionally locked to one public niche. Diversity is enforced
+# with internal space themes rather than by rotating into unrelated subjects.
+NICHES = ("space",)
+SPACE_THEME_COOLDOWN = 6
 TOPIC_COOLDOWN = 40
 EXPLORATION_RATE = 0.20
 
-TOPIC_LIBRARY: dict[str, list[tuple[str, bool]]] = {
-    "space": [
-        ("What would happen if Earth stopped spinning for one second", True),
-        ("Why neutron stars are the densest visible objects", True),
-        ("The coldest known place in the universe", True),
-        ("How astronauts sleep without falling down", True),
-        ("The strange weather found on distant planets", False),
-        ("Why space can smell like hot metal", False),
-        ("How black holes bend the path of light", True),
-        ("Why sunsets on Mars appear blue", True),
+SPACE_TOPIC_LIBRARY: dict[str, list[tuple[str, bool]]] = {
+    'black_holes': [
+        ('How a black hole bends light into a glowing ring', True),
+        ('Why time runs slower near a black hole', True),
+        ('What the event horizon of a black hole actually means', True),
+        ('How astronomers photographed a black hole shadow', True),
+        ('Why black holes can launch enormous jets', True),
+        ('How merging black holes create gravitational waves', True),
+        ('Could a black hole wander through the Milky Way', False),
+        ('What an astronaut would see while approaching a black hole', False),
     ],
-    "ocean": [
-        ("How deep sea animals survive crushing pressure", True),
-        ("Why the ocean has underwater lakes", True),
-        ("The loudest animal sound in the ocean", True),
-        ("How hydrothermal vents support life without sunlight", True),
-        ("The mysterious daily migration beneath the ocean surface", False),
-        ("Why some ocean waves glow blue at night", False),
-        ("How whales communicate across huge distances", True),
-        ("Why coral reefs support so many species", True),
+    'stars': [
+        ('Why neutron stars are so incredibly dense', True),
+        ('How pulsars act like cosmic clocks', True),
+        ('How stars turn hydrogen into light', True),
+        ('Why red giant stars swell to enormous sizes', True),
+        ('What causes a massive star to explode as a supernova', True),
+        ('Why Sun-like stars end as white dwarfs', True),
+        ('How magnetars create extreme magnetic fields', False),
+        ('What brown dwarfs reveal about failed stars', False),
     ],
-    "animals": [
-        ("Animals that can survive being frozen", True),
-        ("How octopuses solve complex problems", True),
-        ("Why crows can remember human faces", True),
-        ("The fastest biological movement in nature", True),
-        ("How tiny animals navigate using Earths magnetic field", False),
-        ("The animal that can rebuild most of its body", False),
-        ("How geckos walk across ceilings", True),
-        ("Why owls can fly almost silently", True),
+    'solar_system': [
+        ('Why Venus is hotter than Mercury', True),
+        ('Why Uranus rotates on its side', True),
+        ('How Jupiters Great Red Spot survives for centuries', True),
+        ('Why Saturns rings are incredibly thin', True),
+        ('How Jupiters moon Io became so volcanic', True),
+        ('Why Europa may hide a global ocean', True),
+        ('How Pluto developed a blue atmospheric haze', True),
+        ('Why Mercury has ice inside permanently shadowed craters', False),
     ],
-    "ancient_history": [
-        ("How ancient Romans made concrete that heals itself", True),
-        ("The engineering secrets of the Great Pyramid", True),
-        ("How ancient cities moved water without electricity", True),
-        ("The oldest known written customer complaint", True),
-        ("Lost pigments used by ancient artists", False),
-        ("How ancient navigators crossed oceans without maps", False),
-        ("How the Inca built roads across mountains", True),
-        ("Why ancient glass can survive for centuries", True),
+    'mars': [
+        ('Why sunsets on Mars appear blue', True),
+        ('How dust storms can cover nearly all of Mars', True),
+        ('Why Mars lost most of its ancient atmosphere', True),
+        ('How Mars rovers navigate without GPS', True),
+        ('Why Olympus Mons became the tallest volcano in the solar system', True),
+        ('How seasons work differently on Mars', True),
+        ('How Perseverance stores samples for a future return mission', False),
+        ('What ancient Martian river deltas reveal about past water', False),
     ],
-    "human_body": [
-        ("Why your stomach does not digest itself", True),
-        ("How the human body repairs broken bones", True),
-        ("Why fingerprints improve grip", True),
-        ("What causes the feeling of pins and needles", True),
-        ("How the brain predicts what you will see next", False),
-        ("Why humans produce different kinds of tears", False),
-        ("How your inner ear keeps you balanced", True),
-        ("Why muscles shake during intense effort", True),
+    'moon': [
+        ('Why the Moon always shows Earth the same face', True),
+        ('How moonquakes happen on a geologically quiet world', True),
+        ('Why lunar dust is dangerous to astronauts', True),
+        ('How the Moon helps stabilize Earths tilt', True),
+        ('What created the dark lunar maria', True),
+        ('Why permanently shadowed lunar craters may contain ice', True),
+        ('How Apollo astronauts moved in low gravity', False),
+        ('Why the Moon is slowly moving away from Earth', False),
     ],
-    "psychology": [
-        ("Why unfinished tasks stay stuck in your mind", True),
-        ("How expectation changes what food tastes like", True),
-        ("Why time feels faster as routines repeat", True),
-        ("How crowds change individual decisions", True),
-        ("The psychology behind false familiarity", False),
-        ("Why silence can feel longer than it is", False),
-        ("Why choices feel harder when options multiply", True),
-        ("How sleep strengthens new memories", True),
+    'exoplanets': [
+        ('How astronomers detect planets by watching stars dim', True),
+        ('What makes a hot Jupiter so extreme', True),
+        ('How scientists study the atmospheres of distant planets', True),
+        ('What makes an exoplanet potentially habitable', True),
+        ('Why rogue planets travel through space without stars', True),
+        ('How tidal locking changes an alien world', True),
+        ('What super Earths may be made of', False),
+        ('Could some exoplanets rain glass sideways', False),
     ],
-    "strange_science": [
-        ("Materials that get thicker when hit", True),
-        ("How water can boil and freeze at the same time", True),
-        ("Why some metals remember their original shape", True),
-        ("The experiment that makes sound visible", True),
-        ("How light can push microscopic objects", False),
-        ("Why hot water can sometimes freeze first", False),
-        ("How magnetic levitation can suspend objects", True),
-        ("Why soap makes water spread differently", True),
+    'galaxies': [
+        ('How the Milky Ways spiral arms are formed', True),
+        ('What really happens when two galaxies collide', True),
+        ('Why galaxies appear to sit inside dark matter halos', True),
+        ('How the Andromeda galaxy is approaching the Milky Way', True),
+        ('Why some galaxies suddenly stop forming stars', True),
+        ('How quasars can outshine entire galaxies', True),
+        ('What lies at the center of the Milky Way', True),
+        ('How astronomers map gas that human eyes cannot see', False),
     ],
-    "mysteries": [
-        ("The science behind unexplained humming sounds", True),
-        ("Why some ancient maps seem unusually accurate", True),
-        ("The mystery of disappearing desert lakes", True),
-        ("How investigators identify unknown shipwrecks", True),
-        ("The coded messages hidden in historic monuments", False),
-        ("Why abandoned places can preserve sound clues", False),
-        ("How scientists trace the origin of meteorites", True),
-        ("Why some radio signals remain unidentified", True),
+    'cosmology': [
+        ('How astronomers measure the expansion of the universe', True),
+        ('What the cosmic microwave background actually is', True),
+        ('Why distant galaxies appear redshifted', True),
+        ('What scientists mean by dark energy', True),
+        ('How the early universe formed its first atoms', True),
+        ('Why the observable universe has a horizon', True),
+        ('What cosmic inflation tries to explain', False),
+        ('How scientists estimate the age of the universe', False),
     ],
-    "extreme_places": [
-        ("How people live in the coldest inhabited town", True),
-        ("The hottest naturally occurring ground temperatures", True),
-        ("Why high altitude deserts are used to test Mars equipment", True),
-        ("Life beside the worlds most active volcanoes", True),
-        ("The isolated caves with their own ecosystems", False),
-        ("Why some deserts suddenly fill with flowers", False),
-        ("How life survives beneath Antarctic ice", True),
-        ("Why salt flats become giant natural mirrors", True),
+    'asteroids_comets': [
+        ('What makes an asteroid different from a comet', True),
+        ('How NASAs DART mission changed an asteroids orbit', True),
+        ('Why comets grow bright tails near the Sun', True),
+        ('How meteorites reveal the history of the solar system', True),
+        ('What caused the Chelyabinsk meteor shock wave', True),
+        ('Why samples from asteroid Bennu matter', True),
+        ('How astronomers track near Earth objects', False),
+        ('What metal rich asteroids could reveal about planet formation', False),
     ],
-    "technology_future": [
-        ("How quantum sensors can detect tiny changes", True),
-        ("Why solid state batteries could change electric vehicles", True),
-        ("How robots learn delicate hand movements", True),
-        ("The technology behind reusable rockets", True),
-        ("How digital twins predict machine failures", False),
-        ("The future of computing with light instead of electricity", False),
-        ("How heat pumps move more heat than their electricity input", True),
-        ("Why satellite internet needs moving constellations", True),
+    'spaceflight': [
+        ('How reusable rockets land after launch', True),
+        ('Why rockets use multiple stages', True),
+        ('How spacecraft steal speed using gravity assists', True),
+        ('How astronauts dock two spacecraft in orbit', True),
+        ('Why interplanetary launch windows matter', True),
+        ('How heat shields survive atmospheric reentry', True),
+        ('How ion thrusters accelerate spacecraft for years', True),
+        ('Why satellites need regular course corrections', False),
     ],
-    "engineering": [
-        ("Why skyscrapers are designed to sway", True),
-        ("How suspension bridges survive strong winds", True),
-        ("The engineering that keeps tunnels dry", True),
-        ("How aircraft wings bend without breaking", True),
-        ("Why some buildings use giant moving weights", False),
-        ("How engineers move entire historic structures", False),
-        ("How earthquake isolators protect buildings", True),
-        ("Why submarine hulls use rounded shapes", True),
+    'telescopes': [
+        ('How the James Webb Space Telescope sees infrared light', True),
+        ('Why the Hubble Space Telescope orbits above the atmosphere', True),
+        ('How radio telescopes see an invisible universe', True),
+        ('How adaptive optics removes the twinkle of stars', True),
+        ('Why giant telescope mirrors are built from segments', True),
+        ('How gravitational lensing works like a cosmic telescope', True),
+        ('How telescope interferometry creates a sharper image', False),
+        ('How space telescopes detect chemicals in alien atmospheres', False),
     ],
-    "rare_natural_phenomena": [
-        ("How fire rainbows form without fire", True),
-        ("Why ball lightning remains difficult to explain", True),
-        ("How frost flowers grow on sea ice", True),
-        ("Why volcanic lightning appears inside ash clouds", True),
-        ("The conditions that create moonbows", False),
-        ("How singing sand dunes produce deep notes", False),
-        ("Why ice circles rotate in slow rivers", True),
-        ("How lenticular clouds form over mountains", True),
+    'human_spaceflight': [
+        ('How astronauts sleep in microgravity', True),
+        ('Why muscles weaken during long space missions', True),
+        ('How the International Space Station recycles water', True),
+        ('How spacesuits keep astronauts alive in a vacuum', True),
+        ('Why astronauts sometimes see flashes with closed eyes', True),
+        ('Why food can taste different in orbit', True),
+        ('How astronauts exercise without normal gravity', False),
+        ('What months in space do to human bones', False),
+    ],
+    'space_weather': [
+        ('How solar flares can affect technology on Earth', True),
+        ('What creates the northern and southern lights', True),
+        ('How coronal mass ejections travel through space', True),
+        ('Why satellites are vulnerable to space weather', True),
+        ('How the solar wind shapes Earths magnetosphere', True),
+        ('What happened during the Carrington Event', True),
+        ('How scientists forecast dangerous space weather', False),
+        ('Why Mars has little protection from the solar wind', False),
     ],
 }
 
-KEYWORDS = {
-    "space": ("space", "planet", "star", "universe", "astronaut", "rocket", "neutron"),
-    "ocean": ("ocean", "sea", "marine", "underwater", "hydrothermal"),
-    "animals": ("animal", "octopus", "crow", "bird", "wildlife"),
-    "ancient_history": ("ancient", "roman", "pyramid", "historic"),
-    "human_body": ("body", "stomach", "bone", "fingerprint", "tears"),
-    "psychology": ("psychology", "mind", "decision", "familiarity", "routine"),
-    "strange_science": ("science", "water", "metal", "material", "light"),
-    "mysteries": ("mystery", "unexplained", "coded", "unknown", "disappearing"),
-    "extreme_places": ("coldest", "hottest", "desert", "volcano", "cave"),
-    "technology_future": ("quantum", "battery", "robot", "technology", "computing"),
-    "engineering": ("engineering", "bridge", "skyscraper", "tunnel", "aircraft"),
-    "rare_natural_phenomena": ("rainbow", "lightning", "frost", "moonbow", "dune"),
+TOPIC_LIBRARY: dict[str, list[tuple[str, bool]]] = {
+    "space": [row for rows in SPACE_TOPIC_LIBRARY.values() for row in rows]
 }
+TOPIC_THEMES = {topic: theme for theme, rows in SPACE_TOPIC_LIBRARY.items() for topic, _ in rows}
+
+DEFAULT_SPACE_QUEUE = [
+    'How a black hole bends light into a glowing ring',
+    'Why neutron stars are so incredibly dense',
+    'Why Venus is hotter than Mercury',
+    'Why sunsets on Mars appear blue',
+    'Why the Moon always shows Earth the same face',
+    'How astronomers detect planets by watching stars dim',
+    'How the Milky Ways spiral arms are formed',
+    'How astronomers measure the expansion of the universe',
+    'What makes an asteroid different from a comet',
+    'How reusable rockets land after launch',
+    'How the James Webb Space Telescope sees infrared light',
+    'How astronauts sleep in microgravity',
+    'Why time runs slower near a black hole',
+    'How pulsars act like cosmic clocks',
+    'Why Uranus rotates on its side',
+    'How dust storms can cover nearly all of Mars',
+    'How moonquakes happen on a geologically quiet world',
+    'What makes a hot Jupiter so extreme',
+    'What really happens when two galaxies collide',
+    'What the cosmic microwave background actually is',
+    'How NASAs DART mission changed an asteroids orbit',
+    'Why rockets use multiple stages',
+    'Why the Hubble Space Telescope orbits above the atmosphere',
+    'Why muscles weaken during long space missions'
+]
+
+SPACE_KEYWORDS = (
+    "space", "astronomy", "cosmos", "cosmic", "universe", "galaxy", "milky way",
+    "black hole", "event horizon", "star", "supernova", "neutron", "pulsar", "magnetar",
+    "planet", "exoplanet", "moon", "lunar", "mars", "venus", "mercury", "jupiter",
+    "saturn", "uranus", "neptune", "pluto", "asteroid", "comet", "meteor", "solar",
+    "sun", "rocket", "spacecraft", "satellite", "astronaut", "orbit", "telescope",
+    "hubble", "james webb", "jwst", "nasa", "esa", "spaceflight", "microgravity",
+    "aurora", "magnetosphere", "space weather", "gravity assist", "reentry",
+)
 
 
 @dataclass(slots=True)
@@ -185,15 +221,42 @@ class QueueManager:
         self.base.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
+    def is_space_topic(topic: str) -> bool:
+        normalized = topic.strip().casefold()
+        if normalized in {candidate.casefold() for candidate in TOPIC_THEMES}:
+            return True
+        text = re.sub(r"[^a-z0-9]+", " ", normalized)
+        return any(keyword in text for keyword in SPACE_KEYWORDS)
+
+    @staticmethod
     def categorize(topic: str) -> str:
-        normalized_topic = topic.strip().casefold()
-        for niche, rows in TOPIC_LIBRARY.items():
-            if any(candidate.casefold() == normalized_topic for candidate, _ in rows):
-                return niche
-        text = topic.lower()
-        scores = {n: sum(1 for key in KEYWORDS[n] if key in text) for n in NICHES}
-        best = max(scores, key=scores.get)
-        return best if scores[best] else "strange_science"
+        return "space" if QueueManager.is_space_topic(topic) else "non_space"
+
+    @staticmethod
+    def theme(topic: str) -> str:
+        exact = TOPIC_THEMES.get(topic)
+        if exact:
+            return exact
+        text = topic.casefold()
+        rules = (
+            ("black_holes", ("black hole", "event horizon")),
+            ("stars", ("star", "supernova", "pulsar", "neutron", "magnetar", "brown dwarf")),
+            ("mars", ("mars", "martian")),
+            ("moon", ("moon", "lunar", "apollo")),
+            ("exoplanets", ("exoplanet", "alien world", "hot jupiter", "super earth", "rogue planet")),
+            ("galaxies", ("galaxy", "galaxies", "milky way", "andromeda", "quasar")),
+            ("cosmology", ("universe", "cosmic microwave", "dark energy", "redshift", "inflation")),
+            ("asteroids_comets", ("asteroid", "comet", "meteor", "bennu", "dart")),
+            ("spaceflight", ("rocket", "spacecraft", "launch", "reentry", "thruster", "satellite")),
+            ("telescopes", ("telescope", "hubble", "james webb", "jwst", "interferometry")),
+            ("human_spaceflight", ("astronaut", "spacesuit", "microgravity", "space station", "iss")),
+            ("space_weather", ("solar flare", "aurora", "solar wind", "magnetosphere", "space weather")),
+            ("solar_system", ("venus", "mercury", "jupiter", "saturn", "uranus", "neptune", "pluto", "europa", "io")),
+        )
+        for theme, keywords in rules:
+            if any(keyword in text for keyword in keywords):
+                return theme
+        return "general_space"
 
     def read_queue(self) -> list[str]:
         if not self.queue_path.exists():
@@ -206,33 +269,41 @@ class QueueManager:
     def reserve(self, manual_topic: str | None = None) -> QueueReservation:
         if manual_topic and manual_topic.strip():
             topic = manual_topic.strip()
-            reservation = QueueReservation(uuid4().hex, "manual", topic, self.categorize(topic), utc_now())
-            logger.info("Manual topic mode; queue will not be changed: %s", topic)
+            if not self.is_space_topic(topic):
+                raise ValueError(
+                    "This channel is locked to space content. Use an astronomy, cosmology, "
+                    "planetary-science, spaceflight, or space-technology topic."
+                )
+            reservation = QueueReservation(uuid4().hex, "manual", topic, "space", utc_now())
+            logger.info("Manual space-topic mode; queue will not be changed: %s", topic)
             return reservation
         queue = self.read_queue()
         if not queue:
             raise RuntimeError(f"Topic queue is empty: {self.queue_path}")
         topic = queue[0]
-        reservation = QueueReservation(uuid4().hex, "queue", topic, self.categorize(topic), utc_now())
+        if not self.is_space_topic(topic):
+            raise RuntimeError(
+                f"Non-space topic found at queue head: {topic!r}. "
+                "Run the space-only migration or replace topics.txt before publishing."
+            )
+        reservation = QueueReservation(uuid4().hex, "queue", topic, "space", utc_now())
         atomic_write_json(self.tx_path, asdict(reservation))
         logger.info("QUEUE BEFORE: %s", queue)
         logger.info("RESERVED TOPIC: %s", topic)
-        logger.info("RESERVED NICHE: %s", reservation.niche)
+        logger.info("RESERVED NICHE: space")
+        logger.info("RESERVED SPACE THEME: %s", self.theme(topic))
         return reservation
 
     def _all_candidates(self, proven: bool | None = None) -> list[tuple[str, str, bool]]:
         rows: list[tuple[str, str, bool]] = []
-        for niche, topics in TOPIC_LIBRARY.items():
-            for topic, is_proven in topics:
-                if proven is None or is_proven == proven:
-                    rows.append((topic, niche, is_proven))
+        for topic, is_proven in TOPIC_LIBRARY["space"]:
+            if proven is None or is_proven == proven:
+                rows.append((topic, "space", is_proven))
         return rows
 
     def _choose_replacement(self, reservation: QueueReservation, queue_after_pop: list[str], state: dict) -> tuple[str, str]:
-        # The replacement is appended to the queue tail, so compare its niche with
-        # the eight topics that will immediately precede it when it is selected.
-        tail_niches = [self.categorize(topic) for topic in queue_after_pop[-NICHE_COOLDOWN:]]
-        generated_niches = list(state.get("recent_replacement_niches", []))[-NICHE_COOLDOWN:]
+        tail_themes = [self.theme(topic) for topic in queue_after_pop[-SPACE_THEME_COOLDOWN:]]
+        recent_themes = list(state.get("recent_space_themes", []))[-SPACE_THEME_COOLDOWN:]
         recent_topics = list(state.get("used_topics", []))[-TOPIC_COOLDOWN:]
         seed = int(hashlib.sha256(reservation.transaction_id.encode()).hexdigest()[:16], 16)
         rng = random.Random(seed)
@@ -240,29 +311,25 @@ class QueueManager:
         candidates = self._all_candidates(proven=not exploratory)
         rng.shuffle(candidates)
 
-        def allowed(row: tuple[str, str, bool], *, enforce_tail: bool, enforce_generated: bool = True) -> bool:
-            topic, niche, _ = row
+        def allowed(row: tuple[str, str, bool], *, avoid_tail: bool, avoid_recent_theme: bool) -> bool:
+            topic, _, _ = row
+            theme = self.theme(topic)
             return (
                 topic != reservation.topic
                 and topic not in queue_after_pop
                 and topic not in recent_topics
-                and (not enforce_tail or niche not in tail_niches)
-                and (not enforce_generated or niche not in generated_niches)
+                and (not avoid_tail or theme not in tail_themes)
+                and (not avoid_recent_theme or theme not in recent_themes)
             )
 
-        # Keep the generated replacement sequence diverse even when the existing
-        # queue tail makes the stricter condition temporarily impossible.
-        for enforce_tail in (True, False):
+        for avoid_tail, avoid_recent in ((True, True), (False, True), (True, False), (False, False)):
             for row in candidates:
-                if allowed(row, enforce_tail=enforce_tail):
-                    return row[0], row[1]
-        for row in candidates:
-            if allowed(row, enforce_tail=False, enforce_generated=False):
-                return row[0], row[1]
+                if allowed(row, avoid_tail=avoid_tail, avoid_recent_theme=avoid_recent):
+                    return row[0], "space"
         for row in self._all_candidates(None):
             if row[0] not in queue_after_pop and row[0] != reservation.topic:
-                return row[0], row[1]
-        raise RuntimeError("No unique replacement topic is available")
+                return row[0], "space"
+        raise RuntimeError("No unique space replacement topic is available")
 
     def finalize(self, reservation: QueueReservation, success: bool) -> dict:
         if reservation.source == "manual":
@@ -281,78 +348,108 @@ class QueueManager:
         queue = self.read_queue()
         if not queue or queue[0] != reservation.topic:
             raise RuntimeError("Queue head changed after reservation; refusing non-atomic finalization")
+        if any(not self.is_space_topic(topic) for topic in queue):
+            raise RuntimeError("Queue contains a non-space topic; refusing to finalize a space-only channel transaction")
+
         state = read_json(self.state_path, {"recent_niches": [], "used_topics": [], "events": []})
         queue_after = queue[1:]
         replacement, niche = self._choose_replacement(reservation, queue_after, state)
         queue_after.append(replacement)
+        selected_theme = self.theme(reservation.topic)
+        replacement_theme = self.theme(replacement)
 
-        state.setdefault("recent_niches", []).append(reservation.niche)
-        state["recent_niches"] = state["recent_niches"][-NICHE_COOLDOWN:]
+        state.setdefault("recent_niches", []).append("space")
+        state["recent_niches"] = state["recent_niches"][-SPACE_THEME_COOLDOWN:]
+        state.setdefault("recent_replacement_niches", []).append("space")
+        state["recent_replacement_niches"] = state["recent_replacement_niches"][-SPACE_THEME_COOLDOWN:]
+        state.setdefault("recent_space_themes", []).append(replacement_theme)
+        state["recent_space_themes"] = state["recent_space_themes"][-SPACE_THEME_COOLDOWN:]
         state.setdefault("used_topics", []).append(reservation.topic)
         state["used_topics"] = state["used_topics"][-TOPIC_COOLDOWN:]
-        state.setdefault("recent_replacement_niches", []).append(niche)
-        state["recent_replacement_niches"] = state["recent_replacement_niches"][-NICHE_COOLDOWN:]
         event = {
             "transaction_id": reservation.transaction_id,
             "selected_topic": reservation.topic,
-            "selected_niche": reservation.niche,
+            "selected_niche": "space",
+            "selected_theme": selected_theme,
             "replacement_topic": replacement,
-            "replacement_niche": niche,
+            "replacement_niche": "space",
+            "replacement_theme": replacement_theme,
             "finalized_at": utc_now(),
         }
         state.setdefault("events", []).append(event)
         state["events"] = state["events"][-200:]
+
         bank = read_json(self.bank_path, [])
         known = {row.get("topic") for row in bank if isinstance(row, dict)}
-        for topic, topic_niche, proven in self._all_candidates(None):
-            if topic not in known:
-                bank.append({"topic": topic, "niche": topic_niche, "proven": proven})
+        for theme, rows in SPACE_TOPIC_LIBRARY.items():
+            for topic, proven in rows:
+                if topic not in known:
+                    bank.append({"topic": topic, "niche": "space", "theme": theme, "proven": proven})
 
         finalized = asdict(reservation)
         finalized.update({
             "status": "finalized", "finalized_at": utc_now(), "queue_changed": True,
             "replacement_topic": replacement, "replacement_niche": niche,
+            "selected_theme": selected_theme, "replacement_theme": replacement_theme,
             "queue_before": queue, "queue_after": queue_after,
         })
         self._write_queue(queue_after)
         atomic_write_json(self.state_path, state)
         atomic_write_json(self.bank_path, bank)
         atomic_write_json(self.tx_path, finalized)
-        logger.info("RECENT NICHES: %s", state["recent_niches"])
+        logger.info("RECENT SPACE THEMES: %s", state["recent_space_themes"])
         logger.info("REPLACEMENT TOPIC: %s", replacement)
-        logger.info("REPLACEMENT NICHE: %s", niche)
+        logger.info("REPLACEMENT NICHE: space")
+        logger.info("REPLACEMENT SPACE THEME: %s", replacement_theme)
         logger.info("QUEUE AFTER: %s", queue_after)
         logger.info("QUEUE COMMIT STATUS: finalized locally")
         return finalized
 
 
+def default_space_queue() -> list[str]:
+    return list(DEFAULT_SPACE_QUEUE)
+
+
 def self_test() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         manager = QueueManager(tmp)
-        initial = [TOPIC_LIBRARY[niche][round_index][0] for round_index in range(2) for niche in NICHES]
+        initial = default_space_queue()
         manager._write_queue(initial)
-        atomic_write_json(manager.state_path, {"recent_niches": [], "used_topics": [], "events": []})
+        atomic_write_json(manager.state_path, {"recent_niches": [], "recent_space_themes": [], "used_topics": [], "events": []})
         previous_len = len(initial)
+        replacement_themes: list[str] = []
         for _ in range(50):
             before = manager.read_queue()
             reservation = manager.reserve()
+            assert reservation.niche == "space"
             result = manager.finalize(reservation, True)
             after = manager.read_queue()
+            replacement_themes.append(result["replacement_theme"])
             assert result["status"] == "finalized"
             assert len(after) == previous_len
             assert before[1:] == after[:-1]
             assert len(after) == len(set(after))
+            assert all(manager.is_space_topic(topic) for topic in after)
             again = manager.finalize(reservation, True)
             assert again["status"] == "finalized"
             assert manager.read_queue() == after
+        for index, theme in enumerate(replacement_themes):
+            recent = replacement_themes[max(0, index - SPACE_THEME_COOLDOWN):index]
+            assert theme not in recent
         before = manager.read_queue()
-        manual = manager.reserve("A manual test topic")
+        manual = manager.reserve("How black holes bend light")
         manager.finalize(manual, True)
         assert manager.read_queue() == before
+        try:
+            manager.reserve("Why unfinished tasks stay in your mind")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Non-space manual topic was not rejected")
         failed = manager.reserve()
         manager.finalize(failed, False)
         assert manager.read_queue() == before
-    print("topic_engine self-test passed: 50 rotations, rollback, manual mode, idempotency")
+    print("topic_engine self-test passed: space-only queue, 50 rotations, theme diversity, rollback, manual guard, idempotency")
 
 
 def main() -> None:
