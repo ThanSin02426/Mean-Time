@@ -1,20 +1,20 @@
 {
   "version": 2,
   "recent_niches": [
-    "space",
     "ocean",
     "animals",
     "ancient_history",
     "human_body",
-    "psychology"
+    "psychology",
+    "space"
   ],
   "recent_replacement_niches": [
-    "animals",
     "ocean",
     "psychology",
     "human_body",
     "ancient_history",
-    "extreme_places"
+    "extreme_places",
+    "space"
   ],
   "used_topics": [
     "What would happen if Earth stopped spinning for one second",
@@ -22,7 +22,8 @@
     "Animals that can survive being frozen",
     "How ancient Romans made concrete that heals itself",
     "Why your stomach does not digest itself",
-    "Why unfinished tasks stay stuck in your mind"
+    "Why unfinished tasks stay stuck in your mind",
+    "How a black hole bends light into a glowing ring"
   ],
   "events": [
     {
@@ -72,6 +73,19 @@
       "replacement_topic": "Why high altitude deserts are used to test Mars equipment",
       "replacement_niche": "extreme_places",
       "finalized_at": "2026-07-18T14:47:37.711222+00:00"
+    },
+    {
+      "transaction_id": "a2ff202dcb5542e08e4d737df7768cf3",
+      "selected_topic": "How a black hole bends light into a glowing ring",
+      "selected_niche": "space",
+      "selected_theme": "black_holes",
+      "replacement_topic": "Why permanently shadowed lunar craters may contain ice",
+      "replacement_niche": "space",
+      "replacement_theme": "moon",
+      "finalized_at": "2026-07-19T06:15:15.998889+00:00"
     }
+  ],
+  "recent_space_themes": [
+    "moon"
   ]
 }
