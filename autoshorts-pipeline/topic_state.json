@@ -1,19 +1,19 @@
 {
   "version": 2,
   "recent_niches": [
-    "ocean",
     "animals",
     "ancient_history",
     "human_body",
     "psychology",
+    "space",
     "space"
   ],
   "recent_replacement_niches": [
-    "ocean",
     "psychology",
     "human_body",
     "ancient_history",
     "extreme_places",
+    "space",
     "space"
   ],
   "used_topics": [
@@ -23,7 +23,8 @@
     "How ancient Romans made concrete that heals itself",
     "Why your stomach does not digest itself",
     "Why unfinished tasks stay stuck in your mind",
-    "How a black hole bends light into a glowing ring"
+    "How a black hole bends light into a glowing ring",
+    "Why neutron stars are so incredibly dense"
   ],
   "events": [
     {
@@ -83,9 +84,20 @@
       "replacement_niche": "space",
       "replacement_theme": "moon",
       "finalized_at": "2026-07-19T06:15:15.998889+00:00"
+    },
+    {
+      "transaction_id": "4e9934cf02504f1fbea48df528a7b56f",
+      "selected_topic": "Why neutron stars are so incredibly dense",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "What lies at the center of the Milky Way",
+      "replacement_niche": "space",
+      "replacement_theme": "galaxies",
+      "finalized_at": "2026-07-20T15:48:19.838703+00:00"
     }
   ],
   "recent_space_themes": [
-    "moon"
+    "moon",
+    "galaxies"
   ]
 }
