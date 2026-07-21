@@ -1,18 +1,18 @@
 {
   "version": 2,
   "recent_niches": [
-    "animals",
     "ancient_history",
     "human_body",
     "psychology",
     "space",
+    "space",
     "space"
   ],
   "recent_replacement_niches": [
-    "psychology",
     "human_body",
     "ancient_history",
     "extreme_places",
+    "space",
     "space",
     "space"
   ],
@@ -24,7 +24,8 @@
     "Why your stomach does not digest itself",
     "Why unfinished tasks stay stuck in your mind",
     "How a black hole bends light into a glowing ring",
-    "Why neutron stars are so incredibly dense"
+    "Why neutron stars are so incredibly dense",
+    "Why Venus is hotter than Mercury"
   ],
   "events": [
     {
@@ -94,10 +95,21 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-07-20T15:48:19.838703+00:00"
+    },
+    {
+      "transaction_id": "52b9445a7460474f88f5402634494292",
+      "selected_topic": "Why Venus is hotter than Mercury",
+      "selected_niche": "space",
+      "selected_theme": "solar_system",
+      "replacement_topic": "Why Sun-like stars end as white dwarfs",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-07-21T15:31:43.754717+00:00"
     }
   ],
   "recent_space_themes": [
     "moon",
-    "galaxies"
+    "galaxies",
+    "stars"
   ]
 }
