@@ -1,17 +1,17 @@
 {
   "version": 2,
   "recent_niches": [
-    "ancient_history",
     "human_body",
     "psychology",
+    "space",
     "space",
     "space",
     "space"
   ],
   "recent_replacement_niches": [
-    "human_body",
     "ancient_history",
     "extreme_places",
+    "space",
     "space",
     "space",
     "space"
@@ -25,7 +25,8 @@
     "Why unfinished tasks stay stuck in your mind",
     "How a black hole bends light into a glowing ring",
     "Why neutron stars are so incredibly dense",
-    "Why Venus is hotter than Mercury"
+    "Why Venus is hotter than Mercury",
+    "Why sunsets on Mars appear blue"
   ],
   "events": [
     {
@@ -105,11 +106,22 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-07-21T15:31:43.754717+00:00"
+    },
+    {
+      "transaction_id": "b884a1440f4949e08eeeafaa29d5d928",
+      "selected_topic": "Why sunsets on Mars appear blue",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "Why samples from asteroid Bennu matter",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-07-22T06:25:03.238763+00:00"
     }
   ],
   "recent_space_themes": [
     "moon",
     "galaxies",
-    "stars"
+    "stars",
+    "asteroids_comets"
   ]
 }
