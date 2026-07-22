@@ -1,4 +1,3 @@
-Why the Moon always shows Earth the same face
 How astronomers detect planets by watching stars dim
 How the Milky Ways spiral arms are formed
 How astronomers measure the expansion of the universe
@@ -22,3 +21,4 @@ Why permanently shadowed lunar craters may contain ice
 What lies at the center of the Milky Way
 Why Sun-like stars end as white dwarfs
 Why samples from asteroid Bennu matter
+How astronauts dock two spacecraft in orbit
