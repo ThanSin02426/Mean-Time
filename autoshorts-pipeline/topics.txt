@@ -1,4 +1,3 @@
-How the Milky Ways spiral arms are formed
 How astronomers measure the expansion of the universe
 What makes an asteroid different from a comet
 How reusable rockets land after launch
@@ -22,3 +21,4 @@ Why Sun-like stars end as white dwarfs
 Why samples from asteroid Bennu matter
 How astronauts dock two spacecraft in orbit
 Why black holes can launch enormous jets
+How the early universe formed its first atoms

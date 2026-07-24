@@ -28,7 +28,8 @@
     "Why Venus is hotter than Mercury",
     "Why sunsets on Mars appear blue",
     "Why the Moon always shows Earth the same face",
-    "How astronomers detect planets by watching stars dim"
+    "How astronomers detect planets by watching stars dim",
+    "How the Milky Ways spiral arms are formed"
   ],
   "events": [
     {
@@ -138,14 +139,24 @@
       "replacement_niche": "space",
       "replacement_theme": "black_holes",
       "finalized_at": "2026-07-24T06:12:00.859430+00:00"
+    },
+    {
+      "transaction_id": "d5358bfec6094bbe820a658086bea880",
+      "selected_topic": "How the Milky Ways spiral arms are formed",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "How the early universe formed its first atoms",
+      "replacement_niche": "space",
+      "replacement_theme": "cosmology",
+      "finalized_at": "2026-07-24T15:24:22.287139+00:00"
     }
   ],
   "recent_space_themes": [
-    "moon",
     "galaxies",
     "stars",
     "asteroids_comets",
     "spaceflight",
-    "black_holes"
+    "black_holes",
+    "cosmology"
   ]
 }
