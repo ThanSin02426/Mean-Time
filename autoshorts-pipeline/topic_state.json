@@ -1,7 +1,7 @@
 {
   "version": 2,
   "recent_niches": [
-    "psychology",
+    "space",
     "space",
     "space",
     "space",
@@ -9,7 +9,7 @@
     "space"
   ],
   "recent_replacement_niches": [
-    "extreme_places",
+    "space",
     "space",
     "space",
     "space",
@@ -27,7 +27,8 @@
     "Why neutron stars are so incredibly dense",
     "Why Venus is hotter than Mercury",
     "Why sunsets on Mars appear blue",
-    "Why the Moon always shows Earth the same face"
+    "Why the Moon always shows Earth the same face",
+    "How astronomers detect planets by watching stars dim"
   ],
   "events": [
     {
@@ -127,6 +128,16 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-07-22T15:28:43.549448+00:00"
+    },
+    {
+      "transaction_id": "d95abc3206974958a8669ab629faf25e",
+      "selected_topic": "How astronomers detect planets by watching stars dim",
+      "selected_niche": "space",
+      "selected_theme": "exoplanets",
+      "replacement_topic": "Why black holes can launch enormous jets",
+      "replacement_niche": "space",
+      "replacement_theme": "black_holes",
+      "finalized_at": "2026-07-24T06:12:00.859430+00:00"
     }
   ],
   "recent_space_themes": [
@@ -134,6 +145,7 @@
     "galaxies",
     "stars",
     "asteroids_comets",
-    "spaceflight"
+    "spaceflight",
+    "black_holes"
   ]
 }
