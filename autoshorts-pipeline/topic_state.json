@@ -30,7 +30,8 @@
     "Why the Moon always shows Earth the same face",
     "How astronomers detect planets by watching stars dim",
     "How the Milky Ways spiral arms are formed",
-    "How astronomers measure the expansion of the universe"
+    "How astronomers measure the expansion of the universe",
+    "What makes an asteroid different from a comet"
   ],
   "events": [
     {
@@ -160,14 +161,24 @@
       "replacement_niche": "space",
       "replacement_theme": "telescopes",
       "finalized_at": "2026-07-25T06:02:45.629406+00:00"
+    },
+    {
+      "transaction_id": "3674cbea47444236a673cd8f8c187b74",
+      "selected_topic": "What makes an asteroid different from a comet",
+      "selected_niche": "space",
+      "selected_theme": "asteroids_comets",
+      "replacement_topic": "Why Saturns rings are incredibly thin",
+      "replacement_niche": "space",
+      "replacement_theme": "solar_system",
+      "finalized_at": "2026-07-25T14:57:52.357265+00:00"
     }
   ],
   "recent_space_themes": [
-    "stars",
     "asteroids_comets",
     "spaceflight",
     "black_holes",
     "cosmology",
-    "telescopes"
+    "telescopes",
+    "solar_system"
   ]
 }
