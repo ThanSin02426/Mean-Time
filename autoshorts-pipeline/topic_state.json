@@ -29,7 +29,8 @@
     "Why sunsets on Mars appear blue",
     "Why the Moon always shows Earth the same face",
     "How astronomers detect planets by watching stars dim",
-    "How the Milky Ways spiral arms are formed"
+    "How the Milky Ways spiral arms are formed",
+    "How astronomers measure the expansion of the universe"
   ],
   "events": [
     {
@@ -149,14 +150,24 @@
       "replacement_niche": "space",
       "replacement_theme": "cosmology",
       "finalized_at": "2026-07-24T15:24:22.287139+00:00"
+    },
+    {
+      "transaction_id": "44954f8047dd42c587a3ab0b1a4e31c1",
+      "selected_topic": "How astronomers measure the expansion of the universe",
+      "selected_niche": "space",
+      "selected_theme": "cosmology",
+      "replacement_topic": "How gravitational lensing works like a cosmic telescope",
+      "replacement_niche": "space",
+      "replacement_theme": "telescopes",
+      "finalized_at": "2026-07-25T06:02:45.629406+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "stars",
     "asteroids_comets",
     "spaceflight",
     "black_holes",
-    "cosmology"
+    "cosmology",
+    "telescopes"
   ]
 }
