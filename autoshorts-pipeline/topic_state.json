@@ -31,7 +31,8 @@
     "How astronomers detect planets by watching stars dim",
     "How the Milky Ways spiral arms are formed",
     "How astronomers measure the expansion of the universe",
-    "What makes an asteroid different from a comet"
+    "What makes an asteroid different from a comet",
+    "How reusable rockets land after launch"
   ],
   "events": [
     {
@@ -171,14 +172,24 @@
       "replacement_niche": "space",
       "replacement_theme": "solar_system",
       "finalized_at": "2026-07-25T14:57:52.357265+00:00"
+    },
+    {
+      "transaction_id": "af7deb5f22e9466a9786457e740faaff",
+      "selected_topic": "How reusable rockets land after launch",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "How the International Space Station recycles water",
+      "replacement_niche": "space",
+      "replacement_theme": "human_spaceflight",
+      "finalized_at": "2026-07-26T06:22:16.008391+00:00"
     }
   ],
   "recent_space_themes": [
-    "asteroids_comets",
     "spaceflight",
     "black_holes",
     "cosmology",
     "telescopes",
-    "solar_system"
+    "solar_system",
+    "human_spaceflight"
   ]
 }
