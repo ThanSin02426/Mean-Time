@@ -32,7 +32,8 @@
     "How the Milky Ways spiral arms are formed",
     "How astronomers measure the expansion of the universe",
     "What makes an asteroid different from a comet",
-    "How reusable rockets land after launch"
+    "How reusable rockets land after launch",
+    "How the James Webb Space Telescope sees infrared light"
   ],
   "events": [
     {
@@ -182,14 +183,24 @@
       "replacement_niche": "space",
       "replacement_theme": "human_spaceflight",
       "finalized_at": "2026-07-26T06:22:16.008391+00:00"
+    },
+    {
+      "transaction_id": "1af5967bdb1344598f15fa1b4e06a380",
+      "selected_topic": "How the James Webb Space Telescope sees infrared light",
+      "selected_niche": "space",
+      "selected_theme": "telescopes",
+      "replacement_topic": "How the Andromeda galaxy is approaching the Milky Way",
+      "replacement_niche": "space",
+      "replacement_theme": "galaxies",
+      "finalized_at": "2026-07-26T15:39:51.555954+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "black_holes",
     "cosmology",
     "telescopes",
     "solar_system",
-    "human_spaceflight"
+    "human_spaceflight",
+    "galaxies"
   ]
 }
