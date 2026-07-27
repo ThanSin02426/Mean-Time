@@ -33,7 +33,8 @@
     "How astronomers measure the expansion of the universe",
     "What makes an asteroid different from a comet",
     "How reusable rockets land after launch",
-    "How the James Webb Space Telescope sees infrared light"
+    "How the James Webb Space Telescope sees infrared light",
+    "How astronauts sleep in microgravity"
   ],
   "events": [
     {
@@ -193,14 +194,24 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-07-26T15:39:51.555954+00:00"
+    },
+    {
+      "transaction_id": "a8081d2bbe624b7d88190730073a1ef3",
+      "selected_topic": "How astronauts sleep in microgravity",
+      "selected_niche": "space",
+      "selected_theme": "human_spaceflight",
+      "replacement_topic": "How solar flares can affect technology on Earth",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-07-27T16:12:01.238128+00:00"
     }
   ],
   "recent_space_themes": [
-    "black_holes",
     "cosmology",
     "telescopes",
     "solar_system",
     "human_spaceflight",
-    "galaxies"
+    "galaxies",
+    "space_weather"
   ]
 }
