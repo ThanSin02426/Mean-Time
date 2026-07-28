@@ -34,7 +34,8 @@
     "What makes an asteroid different from a comet",
     "How reusable rockets land after launch",
     "How the James Webb Space Telescope sees infrared light",
-    "How astronauts sleep in microgravity"
+    "How astronauts sleep in microgravity",
+    "Why time runs slower near a black hole"
   ],
   "events": [
     {
@@ -204,14 +205,24 @@
       "replacement_niche": "space",
       "replacement_theme": "space_weather",
       "finalized_at": "2026-07-27T16:12:01.238128+00:00"
+    },
+    {
+      "transaction_id": "1ce47e6bf42746569aacdfaf2edec043",
+      "selected_topic": "Why time runs slower near a black hole",
+      "selected_niche": "space",
+      "selected_theme": "black_holes",
+      "replacement_topic": "How spacecraft steal speed using gravity assists",
+      "replacement_niche": "space",
+      "replacement_theme": "spaceflight",
+      "finalized_at": "2026-07-28T06:09:48.283542+00:00"
     }
   ],
   "recent_space_themes": [
-    "cosmology",
     "telescopes",
     "solar_system",
     "human_spaceflight",
     "galaxies",
-    "space_weather"
+    "space_weather",
+    "spaceflight"
   ]
 }

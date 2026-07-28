@@ -1,4 +1,3 @@
-Why time runs slower near a black hole
 How pulsars act like cosmic clocks
 Why Uranus rotates on its side
 How dust storms can cover nearly all of Mars
@@ -22,3 +21,4 @@ Why Saturns rings are incredibly thin
 How the International Space Station recycles water
 How the Andromeda galaxy is approaching the Milky Way
 How solar flares can affect technology on Earth
+How spacecraft steal speed using gravity assists
