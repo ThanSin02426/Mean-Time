@@ -35,7 +35,8 @@
     "How reusable rockets land after launch",
     "How the James Webb Space Telescope sees infrared light",
     "How astronauts sleep in microgravity",
-    "Why time runs slower near a black hole"
+    "Why time runs slower near a black hole",
+    "How pulsars act like cosmic clocks"
   ],
   "events": [
     {
@@ -215,14 +216,24 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-07-28T06:09:48.283542+00:00"
+    },
+    {
+      "transaction_id": "e4474919e7ef42df978409b20e7a5f60",
+      "selected_topic": "How pulsars act like cosmic clocks",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "How meteorites reveal the history of the solar system",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-07-28T16:02:50.832639+00:00"
     }
   ],
   "recent_space_themes": [
-    "telescopes",
     "solar_system",
     "human_spaceflight",
     "galaxies",
     "space_weather",
-    "spaceflight"
+    "spaceflight",
+    "asteroids_comets"
   ]
 }
