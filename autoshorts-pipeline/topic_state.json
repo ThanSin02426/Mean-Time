@@ -37,7 +37,8 @@
     "How astronauts sleep in microgravity",
     "Why time runs slower near a black hole",
     "How pulsars act like cosmic clocks",
-    "Why Uranus rotates on its side"
+    "Why Uranus rotates on its side",
+    "How dust storms can cover nearly all of Mars"
   ],
   "events": [
     {
@@ -237,14 +238,24 @@
       "replacement_niche": "space",
       "replacement_theme": "black_holes",
       "finalized_at": "2026-07-29T06:15:21.888311+00:00"
+    },
+    {
+      "transaction_id": "d17c72460dec4f4caaf9d6b8963423a2",
+      "selected_topic": "How dust storms can cover nearly all of Mars",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "How Jupiters moon Io became so volcanic",
+      "replacement_niche": "space",
+      "replacement_theme": "solar_system",
+      "finalized_at": "2026-07-29T15:49:51.318066+00:00"
     }
   ],
   "recent_space_themes": [
-    "human_spaceflight",
     "galaxies",
     "space_weather",
     "spaceflight",
     "asteroids_comets",
-    "black_holes"
+    "black_holes",
+    "solar_system"
   ]
 }
