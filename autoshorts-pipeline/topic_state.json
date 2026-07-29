@@ -36,7 +36,8 @@
     "How the James Webb Space Telescope sees infrared light",
     "How astronauts sleep in microgravity",
     "Why time runs slower near a black hole",
-    "How pulsars act like cosmic clocks"
+    "How pulsars act like cosmic clocks",
+    "Why Uranus rotates on its side"
   ],
   "events": [
     {
@@ -226,14 +227,24 @@
       "replacement_niche": "space",
       "replacement_theme": "asteroids_comets",
       "finalized_at": "2026-07-28T16:02:50.832639+00:00"
+    },
+    {
+      "transaction_id": "6bd8a03554fd4b4c9823f7150cda681e",
+      "selected_topic": "Why Uranus rotates on its side",
+      "selected_niche": "space",
+      "selected_theme": "solar_system",
+      "replacement_topic": "How astronomers photographed a black hole shadow",
+      "replacement_niche": "space",
+      "replacement_theme": "black_holes",
+      "finalized_at": "2026-07-29T06:15:21.888311+00:00"
     }
   ],
   "recent_space_themes": [
-    "solar_system",
     "human_spaceflight",
     "galaxies",
     "space_weather",
     "spaceflight",
-    "asteroids_comets"
+    "asteroids_comets",
+    "black_holes"
   ]
 }
