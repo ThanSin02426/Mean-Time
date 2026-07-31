@@ -38,7 +38,8 @@
     "Why time runs slower near a black hole",
     "How pulsars act like cosmic clocks",
     "Why Uranus rotates on its side",
-    "How dust storms can cover nearly all of Mars"
+    "How dust storms can cover nearly all of Mars",
+    "How moonquakes happen on a geologically quiet world"
   ],
   "events": [
     {
@@ -248,14 +249,24 @@
       "replacement_niche": "space",
       "replacement_theme": "solar_system",
       "finalized_at": "2026-07-29T15:49:51.318066+00:00"
+    },
+    {
+      "transaction_id": "c25c81f7d6294d3f88ecd408ebf84199",
+      "selected_topic": "How moonquakes happen on a geologically quiet world",
+      "selected_niche": "space",
+      "selected_theme": "moon",
+      "replacement_topic": "What causes a massive star to explode as a supernova",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-07-31T15:58:29.155041+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "space_weather",
     "spaceflight",
     "asteroids_comets",
     "black_holes",
-    "solar_system"
+    "solar_system",
+    "stars"
   ]
 }
