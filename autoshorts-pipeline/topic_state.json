@@ -39,7 +39,8 @@
     "How pulsars act like cosmic clocks",
     "Why Uranus rotates on its side",
     "How dust storms can cover nearly all of Mars",
-    "How moonquakes happen on a geologically quiet world"
+    "How moonquakes happen on a geologically quiet world",
+    "What makes a hot Jupiter so extreme"
   ],
   "events": [
     {
@@ -259,14 +260,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-07-31T15:58:29.155041+00:00"
+    },
+    {
+      "transaction_id": "3b15352fc36a4071a564f091bd0b616f",
+      "selected_topic": "What makes a hot Jupiter so extreme",
+      "selected_niche": "space",
+      "selected_theme": "exoplanets",
+      "replacement_topic": "Why lunar dust is dangerous to astronauts",
+      "replacement_niche": "space",
+      "replacement_theme": "moon",
+      "finalized_at": "2026-08-01T06:16:40.051099+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "spaceflight",
     "asteroids_comets",
     "black_holes",
     "solar_system",
-    "stars"
+    "stars",
+    "moon"
   ]
 }
