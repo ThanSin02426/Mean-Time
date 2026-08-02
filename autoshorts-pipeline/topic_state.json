@@ -40,7 +40,8 @@
     "Why Uranus rotates on its side",
     "How dust storms can cover nearly all of Mars",
     "How moonquakes happen on a geologically quiet world",
-    "What makes a hot Jupiter so extreme"
+    "What makes a hot Jupiter so extreme",
+    "What really happens when two galaxies collide"
   ],
   "events": [
     {
@@ -270,14 +271,24 @@
       "replacement_niche": "space",
       "replacement_theme": "moon",
       "finalized_at": "2026-08-01T06:16:40.051099+00:00"
+    },
+    {
+      "transaction_id": "d7ad4b9bc3a1493f9b70fbe58a6793a2",
+      "selected_topic": "What really happens when two galaxies collide",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "What happened during the Carrington Event",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-08-02T06:19:00.996450+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "asteroids_comets",
     "black_holes",
     "solar_system",
     "stars",
-    "moon"
+    "moon",
+    "space_weather"
   ]
 }
