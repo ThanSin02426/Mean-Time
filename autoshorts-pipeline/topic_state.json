@@ -41,7 +41,8 @@
     "How dust storms can cover nearly all of Mars",
     "How moonquakes happen on a geologically quiet world",
     "What makes a hot Jupiter so extreme",
-    "What really happens when two galaxies collide"
+    "What really happens when two galaxies collide",
+    "What the cosmic microwave background actually is"
   ],
   "events": [
     {
@@ -281,14 +282,24 @@
       "replacement_niche": "space",
       "replacement_theme": "space_weather",
       "finalized_at": "2026-08-02T06:19:00.996450+00:00"
+    },
+    {
+      "transaction_id": "626fda7daaf64cc683e96d76d20dacfa",
+      "selected_topic": "What the cosmic microwave background actually is",
+      "selected_niche": "space",
+      "selected_theme": "cosmology",
+      "replacement_topic": "What makes an exoplanet potentially habitable",
+      "replacement_niche": "space",
+      "replacement_theme": "exoplanets",
+      "finalized_at": "2026-08-07T05:14:55.557822+00:00"
     }
   ],
   "recent_space_themes": [
-    "asteroids_comets",
     "black_holes",
     "solar_system",
     "stars",
     "moon",
-    "space_weather"
+    "space_weather",
+    "exoplanets"
   ]
 }
