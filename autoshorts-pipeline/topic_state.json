@@ -42,7 +42,8 @@
     "How moonquakes happen on a geologically quiet world",
     "What makes a hot Jupiter so extreme",
     "What really happens when two galaxies collide",
-    "What the cosmic microwave background actually is"
+    "What the cosmic microwave background actually is",
+    "How NASAs DART mission changed an asteroids orbit"
   ],
   "events": [
     {
@@ -292,14 +293,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-08-07T05:14:55.557822+00:00"
+    },
+    {
+      "transaction_id": "accd30bbdc8d48aebebf36cd87c43c7c",
+      "selected_topic": "How NASAs DART mission changed an asteroids orbit",
+      "selected_niche": "space",
+      "selected_theme": "asteroids_comets",
+      "replacement_topic": "Why Olympus Mons became the tallest volcano in the solar system",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-08-09T14:28:52.697193+00:00"
     }
   ],
   "recent_space_themes": [
-    "black_holes",
     "solar_system",
     "stars",
     "moon",
     "space_weather",
-    "exoplanets"
+    "exoplanets",
+    "mars"
   ]
 }
