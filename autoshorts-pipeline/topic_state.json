@@ -43,7 +43,8 @@
     "What makes a hot Jupiter so extreme",
     "What really happens when two galaxies collide",
     "What the cosmic microwave background actually is",
-    "How NASAs DART mission changed an asteroids orbit"
+    "How NASAs DART mission changed an asteroids orbit",
+    "Why rockets use multiple stages"
   ],
   "events": [
     {
@@ -303,14 +304,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-08-09T14:28:52.697193+00:00"
+    },
+    {
+      "transaction_id": "a38607938c6e4e81a0a79fd2a7bd8c47",
+      "selected_topic": "Why rockets use multiple stages",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "How merging black holes create gravitational waves",
+      "replacement_niche": "space",
+      "replacement_theme": "black_holes",
+      "finalized_at": "2026-08-10T05:06:41.881922+00:00"
     }
   ],
   "recent_space_themes": [
-    "solar_system",
     "stars",
     "moon",
     "space_weather",
     "exoplanets",
-    "mars"
+    "mars",
+    "black_holes"
   ]
 }

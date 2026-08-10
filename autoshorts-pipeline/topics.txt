@@ -1,4 +1,3 @@
-Why rockets use multiple stages
 Why the Hubble Space Telescope orbits above the atmosphere
 Why muscles weaken during long space missions
 Why permanently shadowed lunar craters may contain ice
@@ -22,3 +21,4 @@ Why lunar dust is dangerous to astronauts
 What happened during the Carrington Event
 What makes an exoplanet potentially habitable
 Why Olympus Mons became the tallest volcano in the solar system
+How merging black holes create gravitational waves
