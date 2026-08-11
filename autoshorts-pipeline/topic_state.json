@@ -44,7 +44,8 @@
     "What really happens when two galaxies collide",
     "What the cosmic microwave background actually is",
     "How NASAs DART mission changed an asteroids orbit",
-    "Why rockets use multiple stages"
+    "Why rockets use multiple stages",
+    "Why the Hubble Space Telescope orbits above the atmosphere"
   ],
   "events": [
     {
@@ -314,14 +315,24 @@
       "replacement_niche": "space",
       "replacement_theme": "black_holes",
       "finalized_at": "2026-08-10T05:06:41.881922+00:00"
+    },
+    {
+      "transaction_id": "b9656bb037bf4235bbb817b1524638ef",
+      "selected_topic": "Why the Hubble Space Telescope orbits above the atmosphere",
+      "selected_niche": "space",
+      "selected_theme": "telescopes",
+      "replacement_topic": "What caused the Chelyabinsk meteor shock wave",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-08-11T14:53:48.636586+00:00"
     }
   ],
   "recent_space_themes": [
-    "stars",
     "moon",
     "space_weather",
     "exoplanets",
     "mars",
-    "black_holes"
+    "black_holes",
+    "asteroids_comets"
   ]
 }
