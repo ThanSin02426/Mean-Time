@@ -46,7 +46,8 @@
     "How NASAs DART mission changed an asteroids orbit",
     "Why rockets use multiple stages",
     "Why the Hubble Space Telescope orbits above the atmosphere",
-    "Why muscles weaken during long space missions"
+    "Why muscles weaken during long space missions",
+    "Why permanently shadowed lunar craters may contain ice"
   ],
   "events": [
     {
@@ -336,14 +337,24 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-08-12T05:15:19.125960+00:00"
+    },
+    {
+      "transaction_id": "4054083353a447a081e4672298b2310f",
+      "selected_topic": "Why permanently shadowed lunar craters may contain ice",
+      "selected_niche": "space",
+      "selected_theme": "moon",
+      "replacement_topic": "How magnetars create extreme magnetic fields",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-08-13T05:19:53.907206+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "exoplanets",
     "mars",
     "black_holes",
     "asteroids_comets",
-    "spaceflight"
+    "spaceflight",
+    "stars"
   ]
 }
