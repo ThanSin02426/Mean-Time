@@ -47,7 +47,8 @@
     "Why rockets use multiple stages",
     "Why the Hubble Space Telescope orbits above the atmosphere",
     "Why muscles weaken during long space missions",
-    "Why permanently shadowed lunar craters may contain ice"
+    "Why permanently shadowed lunar craters may contain ice",
+    "What lies at the center of the Milky Way"
   ],
   "events": [
     {
@@ -347,14 +348,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-08-13T05:19:53.907206+00:00"
+    },
+    {
+      "transaction_id": "dffefbf31fe445769df196a4a27153d2",
+      "selected_topic": "What lies at the center of the Milky Way",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "Why food can taste different in orbit",
+      "replacement_niche": "space",
+      "replacement_theme": "human_spaceflight",
+      "finalized_at": "2026-08-16T04:09:18.238666+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "mars",
     "black_holes",
     "asteroids_comets",
     "spaceflight",
-    "stars"
+    "stars",
+    "human_spaceflight"
   ]
 }
