@@ -48,7 +48,8 @@
     "Why the Hubble Space Telescope orbits above the atmosphere",
     "Why muscles weaken during long space missions",
     "Why permanently shadowed lunar craters may contain ice",
-    "What lies at the center of the Milky Way"
+    "What lies at the center of the Milky Way",
+    "Why Sun-like stars end as white dwarfs"
   ],
   "events": [
     {
@@ -358,14 +359,24 @@
       "replacement_niche": "space",
       "replacement_theme": "human_spaceflight",
       "finalized_at": "2026-08-16T04:09:18.238666+00:00"
+    },
+    {
+      "transaction_id": "5671daf56a1048eeba593897c06b4aa2",
+      "selected_topic": "Why Sun-like stars end as white dwarfs",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "How tidal locking changes an alien world",
+      "replacement_niche": "space",
+      "replacement_theme": "exoplanets",
+      "finalized_at": "2026-08-17T04:12:17.843322+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "black_holes",
     "asteroids_comets",
     "spaceflight",
     "stars",
-    "human_spaceflight"
+    "human_spaceflight",
+    "exoplanets"
   ]
 }
