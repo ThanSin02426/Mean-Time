@@ -1,4 +1,3 @@
-Why samples from asteroid Bennu matter
 How astronauts dock two spacecraft in orbit
 Why black holes can launch enormous jets
 How the early universe formed its first atoms
@@ -22,3 +21,4 @@ Why satellites need regular course corrections
 How magnetars create extreme magnetic fields
 Why food can taste different in orbit
 How tidal locking changes an alien world
+What ancient Martian river deltas reveal about past water

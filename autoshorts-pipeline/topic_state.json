@@ -49,7 +49,8 @@
     "Why muscles weaken during long space missions",
     "Why permanently shadowed lunar craters may contain ice",
     "What lies at the center of the Milky Way",
-    "Why Sun-like stars end as white dwarfs"
+    "Why Sun-like stars end as white dwarfs",
+    "Why samples from asteroid Bennu matter"
   ],
   "events": [
     {
@@ -369,14 +370,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-08-17T04:12:17.843322+00:00"
+    },
+    {
+      "transaction_id": "256151a09e4f49908584b8de0d2ba973",
+      "selected_topic": "Why samples from asteroid Bennu matter",
+      "selected_niche": "space",
+      "selected_theme": "asteroids_comets",
+      "replacement_topic": "What ancient Martian river deltas reveal about past water",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-08-18T04:07:55.322416+00:00"
     }
   ],
   "recent_space_themes": [
-    "black_holes",
     "asteroids_comets",
     "spaceflight",
     "stars",
     "human_spaceflight",
-    "exoplanets"
+    "exoplanets",
+    "mars"
   ]
 }
