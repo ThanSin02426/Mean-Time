@@ -50,7 +50,8 @@
     "Why permanently shadowed lunar craters may contain ice",
     "What lies at the center of the Milky Way",
     "Why Sun-like stars end as white dwarfs",
-    "Why samples from asteroid Bennu matter"
+    "Why samples from asteroid Bennu matter",
+    "How astronauts dock two spacecraft in orbit"
   ],
   "events": [
     {
@@ -380,14 +381,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-08-18T04:07:55.322416+00:00"
+    },
+    {
+      "transaction_id": "b09195750ad34b1f8b0064359ecfdbcc",
+      "selected_topic": "How astronauts dock two spacecraft in orbit",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "What creates the northern and southern lights",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-08-19T14:42:27.349966+00:00"
     }
   ],
   "recent_space_themes": [
-    "asteroids_comets",
     "spaceflight",
     "stars",
     "human_spaceflight",
     "exoplanets",
-    "mars"
+    "mars",
+    "space_weather"
   ]
 }
