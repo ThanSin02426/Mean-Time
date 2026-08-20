@@ -51,7 +51,8 @@
     "What lies at the center of the Milky Way",
     "Why Sun-like stars end as white dwarfs",
     "Why samples from asteroid Bennu matter",
-    "How astronauts dock two spacecraft in orbit"
+    "How astronauts dock two spacecraft in orbit",
+    "Why black holes can launch enormous jets"
   ],
   "events": [
     {
@@ -391,14 +392,24 @@
       "replacement_niche": "space",
       "replacement_theme": "space_weather",
       "finalized_at": "2026-08-19T14:42:27.349966+00:00"
+    },
+    {
+      "transaction_id": "f28e0519cab64c838575f6fabd84b57b",
+      "selected_topic": "Why black holes can launch enormous jets",
+      "selected_niche": "space",
+      "selected_theme": "black_holes",
+      "replacement_topic": "What an astronaut would see while approaching a black hole",
+      "replacement_niche": "space",
+      "replacement_theme": "black_holes",
+      "finalized_at": "2026-08-20T14:30:11.651384+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "stars",
     "human_spaceflight",
     "exoplanets",
     "mars",
-    "space_weather"
+    "space_weather",
+    "black_holes"
   ]
 }
