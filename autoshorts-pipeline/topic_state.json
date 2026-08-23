@@ -52,7 +52,8 @@
     "Why Sun-like stars end as white dwarfs",
     "Why samples from asteroid Bennu matter",
     "How astronauts dock two spacecraft in orbit",
-    "Why black holes can launch enormous jets"
+    "Why black holes can launch enormous jets",
+    "How the early universe formed its first atoms"
   ],
   "events": [
     {
@@ -402,14 +403,24 @@
       "replacement_niche": "space",
       "replacement_theme": "black_holes",
       "finalized_at": "2026-08-20T14:30:11.651384+00:00"
+    },
+    {
+      "transaction_id": "7844bbed254b4af58d8863a0ffcc17b3",
+      "selected_topic": "How the early universe formed its first atoms",
+      "selected_niche": "space",
+      "selected_theme": "cosmology",
+      "replacement_topic": "Why giant telescope mirrors are built from segments",
+      "replacement_niche": "space",
+      "replacement_theme": "telescopes",
+      "finalized_at": "2026-08-23T14:18:26.096143+00:00"
     }
   ],
   "recent_space_themes": [
-    "stars",
     "human_spaceflight",
     "exoplanets",
     "mars",
     "space_weather",
-    "black_holes"
+    "black_holes",
+    "telescopes"
   ]
 }
