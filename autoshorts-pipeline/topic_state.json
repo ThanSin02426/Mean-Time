@@ -53,7 +53,8 @@
     "Why samples from asteroid Bennu matter",
     "How astronauts dock two spacecraft in orbit",
     "Why black holes can launch enormous jets",
-    "How the early universe formed its first atoms"
+    "How the early universe formed its first atoms",
+    "How gravitational lensing works like a cosmic telescope"
   ],
   "events": [
     {
@@ -413,14 +414,24 @@
       "replacement_niche": "space",
       "replacement_theme": "telescopes",
       "finalized_at": "2026-08-23T14:18:26.096143+00:00"
+    },
+    {
+      "transaction_id": "5315c43b4083476096bdab96a3a2042c",
+      "selected_topic": "How gravitational lensing works like a cosmic telescope",
+      "selected_niche": "space",
+      "selected_theme": "telescopes",
+      "replacement_topic": "How heat shields survive atmospheric reentry",
+      "replacement_niche": "space",
+      "replacement_theme": "spaceflight",
+      "finalized_at": "2026-08-24T14:37:16.751136+00:00"
     }
   ],
   "recent_space_themes": [
-    "human_spaceflight",
     "exoplanets",
     "mars",
     "space_weather",
     "black_holes",
-    "telescopes"
+    "telescopes",
+    "spaceflight"
   ]
 }
