@@ -54,7 +54,8 @@
     "How astronauts dock two spacecraft in orbit",
     "Why black holes can launch enormous jets",
     "How the early universe formed its first atoms",
-    "How gravitational lensing works like a cosmic telescope"
+    "How gravitational lensing works like a cosmic telescope",
+    "Why Saturns rings are incredibly thin"
   ],
   "events": [
     {
@@ -424,14 +425,24 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-08-24T14:37:16.751136+00:00"
+    },
+    {
+      "transaction_id": "9fb32ca597da4809b0650842bdad63d0",
+      "selected_topic": "Why Saturns rings are incredibly thin",
+      "selected_niche": "space",
+      "selected_theme": "solar_system",
+      "replacement_topic": "What brown dwarfs reveal about failed stars",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-08-25T04:10:49.616293+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "mars",
     "space_weather",
     "black_holes",
     "telescopes",
-    "spaceflight"
+    "spaceflight",
+    "stars"
   ]
 }
