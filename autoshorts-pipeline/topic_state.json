@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What would happen if Earth stopped spinning for one second",
     "How deep sea animals survive crushing pressure",
     "Animals that can survive being frozen",
     "How ancient Romans made concrete that heals itself",
@@ -56,7 +55,8 @@
     "How the early universe formed its first atoms",
     "How gravitational lensing works like a cosmic telescope",
     "Why Saturns rings are incredibly thin",
-    "How the International Space Station recycles water"
+    "How the International Space Station recycles water",
+    "How the Andromeda galaxy is approaching the Milky Way"
   ],
   "events": [
     {
@@ -446,14 +446,24 @@
       "replacement_niche": "space",
       "replacement_theme": "moon",
       "finalized_at": "2026-08-26T04:12:26.719905+00:00"
+    },
+    {
+      "transaction_id": "124734ced2784d1d85ad1f84ba09d9ae",
+      "selected_topic": "How the Andromeda galaxy is approaching the Milky Way",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "How seasons work differently on Mars",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-08-26T14:40:38.061685+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "black_holes",
     "telescopes",
     "spaceflight",
     "stars",
-    "moon"
+    "moon",
+    "mars"
   ]
 }
