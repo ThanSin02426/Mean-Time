@@ -55,7 +55,8 @@
     "Why black holes can launch enormous jets",
     "How the early universe formed its first atoms",
     "How gravitational lensing works like a cosmic telescope",
-    "Why Saturns rings are incredibly thin"
+    "Why Saturns rings are incredibly thin",
+    "How the International Space Station recycles water"
   ],
   "events": [
     {
@@ -435,14 +436,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-08-25T04:10:49.616293+00:00"
+    },
+    {
+      "transaction_id": "f9aac8a1984342e78638239de62778d8",
+      "selected_topic": "How the International Space Station recycles water",
+      "selected_niche": "space",
+      "selected_theme": "human_spaceflight",
+      "replacement_topic": "What created the dark lunar maria",
+      "replacement_niche": "space",
+      "replacement_theme": "moon",
+      "finalized_at": "2026-08-26T04:12:26.719905+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "space_weather",
     "black_holes",
     "telescopes",
     "spaceflight",
-    "stars"
+    "stars",
+    "moon"
   ]
 }
