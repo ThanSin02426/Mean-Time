@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How deep sea animals survive crushing pressure",
     "Animals that can survive being frozen",
     "How ancient Romans made concrete that heals itself",
     "Why your stomach does not digest itself",
@@ -56,7 +55,8 @@
     "How gravitational lensing works like a cosmic telescope",
     "Why Saturns rings are incredibly thin",
     "How the International Space Station recycles water",
-    "How the Andromeda galaxy is approaching the Milky Way"
+    "How the Andromeda galaxy is approaching the Milky Way",
+    "How solar flares can affect technology on Earth"
   ],
   "events": [
     {
@@ -456,14 +456,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-08-26T14:40:38.061685+00:00"
+    },
+    {
+      "transaction_id": "9b6c707b6c1c48a994219d3b8cfe5ff0",
+      "selected_topic": "How solar flares can affect technology on Earth",
+      "selected_niche": "space",
+      "selected_theme": "space_weather",
+      "replacement_topic": "How quasars can outshine entire galaxies",
+      "replacement_niche": "space",
+      "replacement_theme": "galaxies",
+      "finalized_at": "2026-08-27T14:28:28.715147+00:00"
     }
   ],
   "recent_space_themes": [
-    "black_holes",
     "telescopes",
     "spaceflight",
     "stars",
     "moon",
-    "mars"
+    "mars",
+    "galaxies"
   ]
 }
