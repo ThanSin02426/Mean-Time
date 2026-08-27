@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Animals that can survive being frozen",
     "How ancient Romans made concrete that heals itself",
     "Why your stomach does not digest itself",
     "Why unfinished tasks stay stuck in your mind",
@@ -56,7 +55,8 @@
     "Why Saturns rings are incredibly thin",
     "How the International Space Station recycles water",
     "How the Andromeda galaxy is approaching the Milky Way",
-    "How solar flares can affect technology on Earth"
+    "How solar flares can affect technology on Earth",
+    "How spacecraft steal speed using gravity assists"
   ],
   "events": [
     {
@@ -466,14 +466,24 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-08-27T14:28:28.715147+00:00"
+    },
+    {
+      "transaction_id": "2a8ee12cc11b4c189cda915153cb6598",
+      "selected_topic": "How spacecraft steal speed using gravity assists",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "Could some exoplanets rain glass sideways",
+      "replacement_niche": "space",
+      "replacement_theme": "exoplanets",
+      "finalized_at": "2026-08-27T23:26:40.902118+00:00"
     }
   ],
   "recent_space_themes": [
-    "telescopes",
     "spaceflight",
     "stars",
     "moon",
     "mars",
-    "galaxies"
+    "galaxies",
+    "exoplanets"
   ]
 }
