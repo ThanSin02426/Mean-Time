@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How ancient Romans made concrete that heals itself",
     "Why your stomach does not digest itself",
     "Why unfinished tasks stay stuck in your mind",
     "How a black hole bends light into a glowing ring",
@@ -56,7 +55,8 @@
     "How the International Space Station recycles water",
     "How the Andromeda galaxy is approaching the Milky Way",
     "How solar flares can affect technology on Earth",
-    "How spacecraft steal speed using gravity assists"
+    "How spacecraft steal speed using gravity assists",
+    "How meteorites reveal the history of the solar system"
   ],
   "events": [
     {
@@ -476,14 +476,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-08-27T23:26:40.902118+00:00"
+    },
+    {
+      "transaction_id": "c66d02ff5ab84ddeb373c5ee5f3d1431",
+      "selected_topic": "How meteorites reveal the history of the solar system",
+      "selected_niche": "space",
+      "selected_theme": "asteroids_comets",
+      "replacement_topic": "Why satellites are vulnerable to space weather",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-08-29T10:21:36.397645+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "stars",
     "moon",
     "mars",
     "galaxies",
-    "exoplanets"
+    "exoplanets",
+    "space_weather"
   ]
 }
