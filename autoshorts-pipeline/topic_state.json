@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why neutron stars are so incredibly dense",
     "Why Venus is hotter than Mercury",
     "Why sunsets on Mars appear blue",
     "Why the Moon always shows Earth the same face",
@@ -56,7 +55,8 @@
     "How meteorites reveal the history of the solar system",
     "How astronomers photographed a black hole shadow",
     "How Jupiters moon Io became so volcanic",
-    "What causes a massive star to explode as a supernova"
+    "What causes a massive star to explode as a supernova",
+    "Why lunar dust is dangerous to astronauts"
   ],
   "events": [
     {
@@ -516,14 +516,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-09-04T08:09:51.275017+00:00"
+    },
+    {
+      "transaction_id": "bc7c49e29f3540569785fcbde9d7760a",
+      "selected_topic": "Why lunar dust is dangerous to astronauts",
+      "selected_niche": "space",
+      "selected_theme": "moon",
+      "replacement_topic": "How Mars rovers navigate without GPS",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-09-04T17:21:03.770292+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "exoplanets",
     "space_weather",
     "telescopes",
     "human_spaceflight",
-    "stars"
+    "stars",
+    "mars"
   ]
 }
