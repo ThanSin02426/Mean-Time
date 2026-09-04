@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How a black hole bends light into a glowing ring",
     "Why neutron stars are so incredibly dense",
     "Why Venus is hotter than Mercury",
     "Why sunsets on Mars appear blue",
@@ -56,7 +55,8 @@
     "How spacecraft steal speed using gravity assists",
     "How meteorites reveal the history of the solar system",
     "How astronomers photographed a black hole shadow",
-    "How Jupiters moon Io became so volcanic"
+    "How Jupiters moon Io became so volcanic",
+    "What causes a massive star to explode as a supernova"
   ],
   "events": [
     {
@@ -506,14 +506,24 @@
       "replacement_niche": "space",
       "replacement_theme": "human_spaceflight",
       "finalized_at": "2026-09-02T17:34:18.470567+00:00"
+    },
+    {
+      "transaction_id": "ab9f356f32a44acda3def6a4ee600005",
+      "selected_topic": "What causes a massive star to explode as a supernova",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "How stars turn hydrogen into light",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-09-04T08:09:51.275017+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "galaxies",
     "exoplanets",
     "space_weather",
     "telescopes",
-    "human_spaceflight"
+    "human_spaceflight",
+    "stars"
   ]
 }
