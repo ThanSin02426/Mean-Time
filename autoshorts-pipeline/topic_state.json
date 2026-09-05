@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why Venus is hotter than Mercury",
     "Why sunsets on Mars appear blue",
     "Why the Moon always shows Earth the same face",
     "How astronomers detect planets by watching stars dim",
@@ -56,7 +55,8 @@
     "How astronomers photographed a black hole shadow",
     "How Jupiters moon Io became so volcanic",
     "What causes a massive star to explode as a supernova",
-    "Why lunar dust is dangerous to astronauts"
+    "Why lunar dust is dangerous to astronauts",
+    "What happened during the Carrington Event"
   ],
   "events": [
     {
@@ -526,14 +526,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-09-04T17:21:03.770292+00:00"
+    },
+    {
+      "transaction_id": "90aa7b916c5c46c4af386db3a22015ff",
+      "selected_topic": "What happened during the Carrington Event",
+      "selected_niche": "space",
+      "selected_theme": "space_weather",
+      "replacement_topic": "Why galaxies appear to sit inside dark matter halos",
+      "replacement_niche": "space",
+      "replacement_theme": "galaxies",
+      "finalized_at": "2026-09-05T07:50:19.856317+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "space_weather",
     "telescopes",
     "human_spaceflight",
     "stars",
-    "mars"
+    "mars",
+    "galaxies"
   ]
 }
