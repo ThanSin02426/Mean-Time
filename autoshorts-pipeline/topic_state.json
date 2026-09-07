@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why sunsets on Mars appear blue",
     "Why the Moon always shows Earth the same face",
     "How astronomers detect planets by watching stars dim",
     "How the Milky Ways spiral arms are formed",
@@ -56,7 +55,8 @@
     "How Jupiters moon Io became so volcanic",
     "What causes a massive star to explode as a supernova",
     "Why lunar dust is dangerous to astronauts",
-    "What happened during the Carrington Event"
+    "What happened during the Carrington Event",
+    "What makes an exoplanet potentially habitable"
   ],
   "events": [
     {
@@ -536,14 +536,24 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-09-05T07:50:19.856317+00:00"
+    },
+    {
+      "transaction_id": "52c845a28f514f869abb9d05ee17654a",
+      "selected_topic": "What makes an exoplanet potentially habitable",
+      "selected_niche": "space",
+      "selected_theme": "exoplanets",
+      "replacement_topic": "Why comets grow bright tails near the Sun",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-09-07T08:34:22.167963+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "telescopes",
     "human_spaceflight",
     "stars",
     "mars",
-    "galaxies"
+    "galaxies",
+    "asteroids_comets"
   ]
 }
