@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why the Moon always shows Earth the same face",
     "How astronomers detect planets by watching stars dim",
     "How the Milky Ways spiral arms are formed",
     "How astronomers measure the expansion of the universe",
@@ -56,7 +55,8 @@
     "What causes a massive star to explode as a supernova",
     "Why lunar dust is dangerous to astronauts",
     "What happened during the Carrington Event",
-    "What makes an exoplanet potentially habitable"
+    "What makes an exoplanet potentially habitable",
+    "Why Olympus Mons became the tallest volcano in the solar system"
   ],
   "events": [
     {
@@ -546,14 +546,24 @@
       "replacement_niche": "space",
       "replacement_theme": "asteroids_comets",
       "finalized_at": "2026-09-07T08:34:22.167963+00:00"
+    },
+    {
+      "transaction_id": "6968bfa9cc744431b96400981a9e8af4",
+      "selected_topic": "Why Olympus Mons became the tallest volcano in the solar system",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "How the solar wind shapes Earths magnetosphere",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-09-07T18:33:30.295053+00:00"
     }
   ],
   "recent_space_themes": [
-    "telescopes",
     "human_spaceflight",
     "stars",
     "mars",
     "galaxies",
-    "asteroids_comets"
+    "asteroids_comets",
+    "space_weather"
   ]
 }
