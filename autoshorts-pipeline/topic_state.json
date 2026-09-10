@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How astronomers measure the expansion of the universe",
     "What makes an asteroid different from a comet",
     "How reusable rockets land after launch",
     "How the James Webb Space Telescope sees infrared light",
@@ -56,7 +55,8 @@
     "What makes an exoplanet potentially habitable",
     "Why Olympus Mons became the tallest volcano in the solar system",
     "How merging black holes create gravitational waves",
-    "What caused the Chelyabinsk meteor shock wave"
+    "What caused the Chelyabinsk meteor shock wave",
+    "Why satellites need regular course corrections"
   ],
   "events": [
     {
@@ -576,14 +576,24 @@
       "replacement_niche": "space",
       "replacement_theme": "telescopes",
       "finalized_at": "2026-09-10T08:19:43.424027+00:00"
+    },
+    {
+      "transaction_id": "0390e20bd854472493af15b698186096",
+      "selected_topic": "Why satellites need regular course corrections",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "How ion thrusters accelerate spacecraft for years",
+      "replacement_niche": "space",
+      "replacement_theme": "spaceflight",
+      "finalized_at": "2026-09-10T17:27:35.407389+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "galaxies",
     "asteroids_comets",
     "space_weather",
     "moon",
-    "telescopes"
+    "telescopes",
+    "spaceflight"
   ]
 }

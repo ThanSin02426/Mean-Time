@@ -281,5 +281,10 @@
     "https://www.jpl.nasa.gov/news/additional-details-on-the-large-feb-15-fireball-over-russia/",
     "https://www.nationalgeographic.com/science/article/131106-russian-meteor-chelyabinsk-airburst-500-kilotons",
     "https://www.space.com/33623-chelyabinsk-meteor-wake-up-call-for-earth.html"
+  ],
+  "why satellites need regular course corrections": [
+    "https://farside.ph.utexas.edu/teaching/celestial/Celestial/node94.html",
+    "https://www.spaceweather.gov/impacts/satellite-drag",
+    "https://gssc.esa.int/navipedia/index.php/Perturbed_Motion"
   ]
 }
