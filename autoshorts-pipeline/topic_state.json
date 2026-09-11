@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How reusable rockets land after launch",
     "How the James Webb Space Telescope sees infrared light",
     "How astronauts sleep in microgravity",
     "Why time runs slower near a black hole",
@@ -56,7 +55,8 @@
     "How merging black holes create gravitational waves",
     "What caused the Chelyabinsk meteor shock wave",
     "Why satellites need regular course corrections",
-    "How magnetars create extreme magnetic fields"
+    "How magnetars create extreme magnetic fields",
+    "Why food can taste different in orbit"
   ],
   "events": [
     {
@@ -596,14 +596,24 @@
       "replacement_niche": "space",
       "replacement_theme": "solar_system",
       "finalized_at": "2026-09-11T08:15:29.674141+00:00"
+    },
+    {
+      "transaction_id": "fc480e6618bf4ad9b84769fdcbb1723f",
+      "selected_topic": "Why food can taste different in orbit",
+      "selected_niche": "space",
+      "selected_theme": "human_spaceflight",
+      "replacement_topic": "Why astronauts sometimes see flashes with closed eyes",
+      "replacement_niche": "space",
+      "replacement_theme": "human_spaceflight",
+      "finalized_at": "2026-09-11T17:28:28.450266+00:00"
     }
   ],
   "recent_space_themes": [
-    "asteroids_comets",
     "space_weather",
     "moon",
     "telescopes",
     "spaceflight",
-    "solar_system"
+    "solar_system",
+    "human_spaceflight"
   ]
 }
