@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What makes an asteroid different from a comet",
     "How reusable rockets land after launch",
     "How the James Webb Space Telescope sees infrared light",
     "How astronauts sleep in microgravity",
@@ -56,7 +55,8 @@
     "Why Olympus Mons became the tallest volcano in the solar system",
     "How merging black holes create gravitational waves",
     "What caused the Chelyabinsk meteor shock wave",
-    "Why satellites need regular course corrections"
+    "Why satellites need regular course corrections",
+    "How magnetars create extreme magnetic fields"
   ],
   "events": [
     {
@@ -586,14 +586,24 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-09-10T17:27:35.407389+00:00"
+    },
+    {
+      "transaction_id": "45d790dfecf445778489b83c951317eb",
+      "selected_topic": "How magnetars create extreme magnetic fields",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "Why Europa may hide a global ocean",
+      "replacement_niche": "space",
+      "replacement_theme": "solar_system",
+      "finalized_at": "2026-09-11T08:15:29.674141+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "asteroids_comets",
     "space_weather",
     "moon",
     "telescopes",
-    "spaceflight"
+    "spaceflight",
+    "solar_system"
   ]
 }
