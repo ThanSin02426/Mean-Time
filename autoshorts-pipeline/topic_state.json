@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How astronauts sleep in microgravity",
     "Why time runs slower near a black hole",
     "How pulsars act like cosmic clocks",
     "Why Uranus rotates on its side",
@@ -56,7 +55,8 @@
     "Why satellites need regular course corrections",
     "How magnetars create extreme magnetic fields",
     "Why food can taste different in orbit",
-    "How tidal locking changes an alien world"
+    "How tidal locking changes an alien world",
+    "What ancient Martian river deltas reveal about past water"
   ],
   "events": [
     {
@@ -616,14 +616,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-09-12T08:05:30.831147+00:00"
+    },
+    {
+      "transaction_id": "8949d910d17d4c0b9f77347cd6ea1c02",
+      "selected_topic": "What ancient Martian river deltas reveal about past water",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "Why red giant stars swell to enormous sizes",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-09-12T16:42:22.400502+00:00"
     }
   ],
   "recent_space_themes": [
-    "moon",
     "telescopes",
     "spaceflight",
     "solar_system",
     "human_spaceflight",
-    "exoplanets"
+    "exoplanets",
+    "stars"
   ]
 }
