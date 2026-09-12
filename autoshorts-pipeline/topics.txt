@@ -1,4 +1,3 @@
-How tidal locking changes an alien world
 What ancient Martian river deltas reveal about past water
 What creates the northern and southern lights
 What an astronaut would see while approaching a black hole
@@ -22,3 +21,4 @@ How adaptive optics removes the twinkle of stars
 How ion thrusters accelerate spacecraft for years
 Why Europa may hide a global ocean
 Why astronauts sometimes see flashes with closed eyes
+How astronomers detect planets by watching stars dim
