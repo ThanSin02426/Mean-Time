@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why time runs slower near a black hole",
     "How pulsars act like cosmic clocks",
     "Why Uranus rotates on its side",
     "How dust storms can cover nearly all of Mars",
@@ -56,7 +55,8 @@
     "How magnetars create extreme magnetic fields",
     "Why food can taste different in orbit",
     "How tidal locking changes an alien world",
-    "What ancient Martian river deltas reveal about past water"
+    "What ancient Martian river deltas reveal about past water",
+    "What creates the northern and southern lights"
   ],
   "events": [
     {
@@ -626,14 +626,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-09-12T16:42:22.400502+00:00"
+    },
+    {
+      "transaction_id": "7362eaa243644fecab5d09237ce11db8",
+      "selected_topic": "What creates the northern and southern lights",
+      "selected_niche": "space",
+      "selected_theme": "space_weather",
+      "replacement_topic": "How astronomers track near Earth objects",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-09-13T17:11:33.631405+00:00"
     }
   ],
   "recent_space_themes": [
-    "telescopes",
     "spaceflight",
     "solar_system",
     "human_spaceflight",
     "exoplanets",
-    "stars"
+    "stars",
+    "asteroids_comets"
   ]
 }
