@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How pulsars act like cosmic clocks",
     "Why Uranus rotates on its side",
     "How dust storms can cover nearly all of Mars",
     "How moonquakes happen on a geologically quiet world",
@@ -56,7 +55,8 @@
     "Why food can taste different in orbit",
     "How tidal locking changes an alien world",
     "What ancient Martian river deltas reveal about past water",
-    "What creates the northern and southern lights"
+    "What creates the northern and southern lights",
+    "What an astronaut would see while approaching a black hole"
   ],
   "events": [
     {
@@ -636,14 +636,24 @@
       "replacement_niche": "space",
       "replacement_theme": "asteroids_comets",
       "finalized_at": "2026-09-13T17:11:33.631405+00:00"
+    },
+    {
+      "transaction_id": "ab1ae7ac7dce42649201177ef1dd3e16",
+      "selected_topic": "What an astronaut would see while approaching a black hole",
+      "selected_niche": "space",
+      "selected_theme": "black_holes",
+      "replacement_topic": "How Perseverance stores samples for a future return mission",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-09-14T09:11:05.214253+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "solar_system",
     "human_spaceflight",
     "exoplanets",
     "stars",
-    "asteroids_comets"
+    "asteroids_comets",
+    "mars"
   ]
 }
