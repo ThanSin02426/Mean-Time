@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How dust storms can cover nearly all of Mars",
     "How moonquakes happen on a geologically quiet world",
     "What makes a hot Jupiter so extreme",
     "What really happens when two galaxies collide",
@@ -56,7 +55,8 @@
     "What ancient Martian river deltas reveal about past water",
     "What creates the northern and southern lights",
     "What an astronaut would see while approaching a black hole",
-    "Why giant telescope mirrors are built from segments"
+    "Why giant telescope mirrors are built from segments",
+    "How heat shields survive atmospheric reentry"
   ],
   "events": [
     {
@@ -656,14 +656,24 @@
       "replacement_niche": "space",
       "replacement_theme": "telescopes",
       "finalized_at": "2026-09-17T08:50:53.462678+00:00"
+    },
+    {
+      "transaction_id": "29d0fc8ef8f1462394a25ad2cf4e8154",
+      "selected_topic": "How heat shields survive atmospheric reentry",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "What scientists mean by dark energy",
+      "replacement_niche": "space",
+      "replacement_theme": "cosmology",
+      "finalized_at": "2026-09-17T17:56:06.585654+00:00"
     }
   ],
   "recent_space_themes": [
-    "human_spaceflight",
     "exoplanets",
     "stars",
     "asteroids_comets",
     "mars",
-    "telescopes"
+    "telescopes",
+    "cosmology"
   ]
 }
