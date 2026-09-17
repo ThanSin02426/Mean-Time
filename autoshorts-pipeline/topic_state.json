@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why Uranus rotates on its side",
     "How dust storms can cover nearly all of Mars",
     "How moonquakes happen on a geologically quiet world",
     "What makes a hot Jupiter so extreme",
@@ -56,7 +55,8 @@
     "How tidal locking changes an alien world",
     "What ancient Martian river deltas reveal about past water",
     "What creates the northern and southern lights",
-    "What an astronaut would see while approaching a black hole"
+    "What an astronaut would see while approaching a black hole",
+    "Why giant telescope mirrors are built from segments"
   ],
   "events": [
     {
@@ -646,14 +646,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-09-14T09:11:05.214253+00:00"
+    },
+    {
+      "transaction_id": "c4a524ce8efe4998b4ba04a2d5517832",
+      "selected_topic": "Why giant telescope mirrors are built from segments",
+      "selected_niche": "space",
+      "selected_theme": "telescopes",
+      "replacement_topic": "How the James Webb Space Telescope sees infrared light",
+      "replacement_niche": "space",
+      "replacement_theme": "telescopes",
+      "finalized_at": "2026-09-17T08:50:53.462678+00:00"
     }
   ],
   "recent_space_themes": [
-    "solar_system",
     "human_spaceflight",
     "exoplanets",
     "stars",
     "asteroids_comets",
-    "mars"
+    "mars",
+    "telescopes"
   ]
 }
