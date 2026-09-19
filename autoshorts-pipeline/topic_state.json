@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How moonquakes happen on a geologically quiet world",
     "What makes a hot Jupiter so extreme",
     "What really happens when two galaxies collide",
     "What the cosmic microwave background actually is",
@@ -56,7 +55,8 @@
     "What creates the northern and southern lights",
     "What an astronaut would see while approaching a black hole",
     "Why giant telescope mirrors are built from segments",
-    "How heat shields survive atmospheric reentry"
+    "How heat shields survive atmospheric reentry",
+    "What brown dwarfs reveal about failed stars"
   ],
   "events": [
     {
@@ -666,14 +666,24 @@
       "replacement_niche": "space",
       "replacement_theme": "cosmology",
       "finalized_at": "2026-09-17T17:56:06.585654+00:00"
+    },
+    {
+      "transaction_id": "cbc911bfd5e3496998b2ac5bfbc25a90",
+      "selected_topic": "What brown dwarfs reveal about failed stars",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "How Pluto developed a blue atmospheric haze",
+      "replacement_niche": "space",
+      "replacement_theme": "solar_system",
+      "finalized_at": "2026-09-19T08:13:55.347958+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "stars",
     "asteroids_comets",
     "mars",
     "telescopes",
-    "cosmology"
+    "cosmology",
+    "solar_system"
   ]
 }
