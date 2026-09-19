@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What makes a hot Jupiter so extreme",
     "What really happens when two galaxies collide",
     "What the cosmic microwave background actually is",
     "How NASAs DART mission changed an asteroids orbit",
@@ -56,7 +55,8 @@
     "What an astronaut would see while approaching a black hole",
     "Why giant telescope mirrors are built from segments",
     "How heat shields survive atmospheric reentry",
-    "What brown dwarfs reveal about failed stars"
+    "What brown dwarfs reveal about failed stars",
+    "What created the dark lunar maria"
   ],
   "events": [
     {
@@ -676,14 +676,24 @@
       "replacement_niche": "space",
       "replacement_theme": "solar_system",
       "finalized_at": "2026-09-19T08:13:55.347958+00:00"
+    },
+    {
+      "transaction_id": "c01a66ebc8634d0b8ae6556ad805217f",
+      "selected_topic": "What created the dark lunar maria",
+      "selected_niche": "space",
+      "selected_theme": "moon",
+      "replacement_topic": "How astronauts exercise without normal gravity",
+      "replacement_niche": "space",
+      "replacement_theme": "human_spaceflight",
+      "finalized_at": "2026-09-19T16:58:36.515722+00:00"
     }
   ],
   "recent_space_themes": [
-    "stars",
     "asteroids_comets",
     "mars",
     "telescopes",
     "cosmology",
-    "solar_system"
+    "solar_system",
+    "human_spaceflight"
   ]
 }
