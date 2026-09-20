@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What really happens when two galaxies collide",
     "What the cosmic microwave background actually is",
     "How NASAs DART mission changed an asteroids orbit",
     "Why rockets use multiple stages",
@@ -56,7 +55,8 @@
     "Why giant telescope mirrors are built from segments",
     "How heat shields survive atmospheric reentry",
     "What brown dwarfs reveal about failed stars",
-    "What created the dark lunar maria"
+    "What created the dark lunar maria",
+    "How seasons work differently on Mars"
   ],
   "events": [
     {
@@ -686,14 +686,24 @@
       "replacement_niche": "space",
       "replacement_theme": "human_spaceflight",
       "finalized_at": "2026-09-19T16:58:36.515722+00:00"
+    },
+    {
+      "transaction_id": "0f9bc72f9d7640d69a0fad7e4a1a701e",
+      "selected_topic": "How seasons work differently on Mars",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "What makes a hot Jupiter so extreme",
+      "replacement_niche": "space",
+      "replacement_theme": "exoplanets",
+      "finalized_at": "2026-09-20T08:46:44.826466+00:00"
     }
   ],
   "recent_space_themes": [
-    "asteroids_comets",
     "mars",
     "telescopes",
     "cosmology",
     "solar_system",
-    "human_spaceflight"
+    "human_spaceflight",
+    "exoplanets"
   ]
 }
