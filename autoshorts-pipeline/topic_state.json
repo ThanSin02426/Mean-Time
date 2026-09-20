@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What the cosmic microwave background actually is",
     "How NASAs DART mission changed an asteroids orbit",
     "Why rockets use multiple stages",
     "Why the Hubble Space Telescope orbits above the atmosphere",
@@ -56,7 +55,8 @@
     "How heat shields survive atmospheric reentry",
     "What brown dwarfs reveal about failed stars",
     "What created the dark lunar maria",
-    "How seasons work differently on Mars"
+    "How seasons work differently on Mars",
+    "How quasars can outshine entire galaxies"
   ],
   "events": [
     {
@@ -696,14 +696,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-09-20T08:46:44.826466+00:00"
+    },
+    {
+      "transaction_id": "75e0ee3e230c4b3ba69f80e78da12ec9",
+      "selected_topic": "How quasars can outshine entire galaxies",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "How reusable rockets land after launch",
+      "replacement_niche": "space",
+      "replacement_theme": "spaceflight",
+      "finalized_at": "2026-09-20T17:13:28.715594+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "telescopes",
     "cosmology",
     "solar_system",
     "human_spaceflight",
-    "exoplanets"
+    "exoplanets",
+    "spaceflight"
   ]
 }
