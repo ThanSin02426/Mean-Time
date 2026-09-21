@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How NASAs DART mission changed an asteroids orbit",
     "Why rockets use multiple stages",
     "Why the Hubble Space Telescope orbits above the atmosphere",
     "Why muscles weaken during long space missions",
@@ -56,7 +55,8 @@
     "What brown dwarfs reveal about failed stars",
     "What created the dark lunar maria",
     "How seasons work differently on Mars",
-    "How quasars can outshine entire galaxies"
+    "How quasars can outshine entire galaxies",
+    "Could some exoplanets rain glass sideways"
   ],
   "events": [
     {
@@ -706,14 +706,24 @@
       "replacement_niche": "space",
       "replacement_theme": "spaceflight",
       "finalized_at": "2026-09-20T17:13:28.715594+00:00"
+    },
+    {
+      "transaction_id": "33e3552e97ad49a48764c62a2a603bf1",
+      "selected_topic": "Could some exoplanets rain glass sideways",
+      "selected_niche": "space",
+      "selected_theme": "exoplanets",
+      "replacement_topic": "What really happens when two galaxies collide",
+      "replacement_niche": "space",
+      "replacement_theme": "galaxies",
+      "finalized_at": "2026-09-21T09:14:15.443638+00:00"
     }
   ],
   "recent_space_themes": [
-    "telescopes",
     "cosmology",
     "solar_system",
     "human_spaceflight",
     "exoplanets",
-    "spaceflight"
+    "spaceflight",
+    "galaxies"
   ]
 }
