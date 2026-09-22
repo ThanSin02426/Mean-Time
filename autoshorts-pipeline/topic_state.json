@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why rockets use multiple stages",
     "Why the Hubble Space Telescope orbits above the atmosphere",
     "Why muscles weaken during long space missions",
     "Why permanently shadowed lunar craters may contain ice",
@@ -56,7 +55,8 @@
     "What created the dark lunar maria",
     "How seasons work differently on Mars",
     "How quasars can outshine entire galaxies",
-    "Could some exoplanets rain glass sideways"
+    "Could some exoplanets rain glass sideways",
+    "Why satellites are vulnerable to space weather"
   ],
   "events": [
     {
@@ -716,14 +716,24 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-09-21T09:14:15.443638+00:00"
+    },
+    {
+      "transaction_id": "9d2dc742efa3464990dc393711de9e2d",
+      "selected_topic": "Why satellites are vulnerable to space weather",
+      "selected_niche": "space",
+      "selected_theme": "space_weather",
+      "replacement_topic": "How space telescopes detect chemicals in alien atmospheres",
+      "replacement_niche": "space",
+      "replacement_theme": "telescopes",
+      "finalized_at": "2026-09-22T17:53:42.328781+00:00"
     }
   ],
   "recent_space_themes": [
-    "cosmology",
     "solar_system",
     "human_spaceflight",
     "exoplanets",
     "spaceflight",
-    "galaxies"
+    "galaxies",
+    "telescopes"
   ]
 }
