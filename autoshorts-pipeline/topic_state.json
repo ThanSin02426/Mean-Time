@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why the Hubble Space Telescope orbits above the atmosphere",
     "Why muscles weaken during long space missions",
     "Why permanently shadowed lunar craters may contain ice",
     "What lies at the center of the Milky Way",
@@ -56,7 +55,8 @@
     "How seasons work differently on Mars",
     "How quasars can outshine entire galaxies",
     "Could some exoplanets rain glass sideways",
-    "Why satellites are vulnerable to space weather"
+    "Why satellites are vulnerable to space weather",
+    "How telescope interferometry creates a sharper image"
   ],
   "events": [
     {
@@ -726,14 +726,24 @@
       "replacement_niche": "space",
       "replacement_theme": "telescopes",
       "finalized_at": "2026-09-22T17:53:42.328781+00:00"
+    },
+    {
+      "transaction_id": "5dd120c15e2f41adbe835dade2e36d6c",
+      "selected_topic": "How telescope interferometry creates a sharper image",
+      "selected_niche": "space",
+      "selected_theme": "telescopes",
+      "replacement_topic": "How scientists forecast dangerous space weather",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-09-23T08:46:26.789111+00:00"
     }
   ],
   "recent_space_themes": [
-    "solar_system",
     "human_spaceflight",
     "exoplanets",
     "spaceflight",
     "galaxies",
-    "telescopes"
+    "telescopes",
+    "space_weather"
   ]
 }
