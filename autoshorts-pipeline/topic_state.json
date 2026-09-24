@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why muscles weaken during long space missions",
     "Why permanently shadowed lunar craters may contain ice",
     "What lies at the center of the Milky Way",
     "Why Sun-like stars end as white dwarfs",
@@ -56,7 +55,8 @@
     "How quasars can outshine entire galaxies",
     "Could some exoplanets rain glass sideways",
     "Why satellites are vulnerable to space weather",
-    "How telescope interferometry creates a sharper image"
+    "How telescope interferometry creates a sharper image",
+    "How spacesuits keep astronauts alive in a vacuum"
   ],
   "events": [
     {
@@ -736,14 +736,24 @@
       "replacement_niche": "space",
       "replacement_theme": "space_weather",
       "finalized_at": "2026-09-23T08:46:26.789111+00:00"
+    },
+    {
+      "transaction_id": "5abc9e9072554e319e879031b63e61dd",
+      "selected_topic": "How spacesuits keep astronauts alive in a vacuum",
+      "selected_niche": "space",
+      "selected_theme": "human_spaceflight",
+      "replacement_topic": "Why the Moon always shows Earth the same face",
+      "replacement_niche": "space",
+      "replacement_theme": "moon",
+      "finalized_at": "2026-09-24T08:43:34.032814+00:00"
     }
   ],
   "recent_space_themes": [
-    "human_spaceflight",
     "exoplanets",
     "spaceflight",
     "galaxies",
     "telescopes",
-    "space_weather"
+    "space_weather",
+    "moon"
   ]
 }
