@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why permanently shadowed lunar craters may contain ice",
     "What lies at the center of the Milky Way",
     "Why Sun-like stars end as white dwarfs",
     "Why samples from asteroid Bennu matter",
@@ -56,7 +55,8 @@
     "Could some exoplanets rain glass sideways",
     "Why satellites are vulnerable to space weather",
     "How telescope interferometry creates a sharper image",
-    "How spacesuits keep astronauts alive in a vacuum"
+    "How spacesuits keep astronauts alive in a vacuum",
+    "How stars turn hydrogen into light"
   ],
   "events": [
     {
@@ -746,14 +746,24 @@
       "replacement_niche": "space",
       "replacement_theme": "moon",
       "finalized_at": "2026-09-24T08:43:34.032814+00:00"
+    },
+    {
+      "transaction_id": "ef5f73cc009c45c6a4100e121221427e",
+      "selected_topic": "How stars turn hydrogen into light",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "How scientists estimate the age of the universe",
+      "replacement_niche": "space",
+      "replacement_theme": "cosmology",
+      "finalized_at": "2026-09-26T08:48:13.203637+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "spaceflight",
     "galaxies",
     "telescopes",
     "space_weather",
-    "moon"
+    "moon",
+    "cosmology"
   ]
 }
