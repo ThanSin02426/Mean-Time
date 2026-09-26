@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "What lies at the center of the Milky Way",
     "Why Sun-like stars end as white dwarfs",
     "Why samples from asteroid Bennu matter",
     "How astronauts dock two spacecraft in orbit",
@@ -56,7 +55,8 @@
     "Why satellites are vulnerable to space weather",
     "How telescope interferometry creates a sharper image",
     "How spacesuits keep astronauts alive in a vacuum",
-    "How stars turn hydrogen into light"
+    "How stars turn hydrogen into light",
+    "How Mars rovers navigate without GPS"
   ],
   "events": [
     {
@@ -756,14 +756,24 @@
       "replacement_niche": "space",
       "replacement_theme": "cosmology",
       "finalized_at": "2026-09-26T08:48:13.203637+00:00"
+    },
+    {
+      "transaction_id": "4212d042369b4b879c35ea3cb3b00980",
+      "selected_topic": "How Mars rovers navigate without GPS",
+      "selected_niche": "space",
+      "selected_theme": "mars",
+      "replacement_topic": "Why sunsets on Mars appear blue",
+      "replacement_niche": "space",
+      "replacement_theme": "mars",
+      "finalized_at": "2026-09-26T17:33:27.609361+00:00"
     }
   ],
   "recent_space_themes": [
-    "spaceflight",
     "galaxies",
     "telescopes",
     "space_weather",
     "moon",
-    "cosmology"
+    "cosmology",
+    "mars"
   ]
 }

@@ -1,4 +1,3 @@
-How Mars rovers navigate without GPS
 Why galaxies appear to sit inside dark matter halos
 Why comets grow bright tails near the Sun
 How the solar wind shapes Earths magnetosphere
@@ -22,3 +21,4 @@ How space telescopes detect chemicals in alien atmospheres
 How scientists forecast dangerous space weather
 Why the Moon always shows Earth the same face
 How scientists estimate the age of the universe
+Why sunsets on Mars appear blue
