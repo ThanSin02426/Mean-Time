@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why Sun-like stars end as white dwarfs",
     "Why samples from asteroid Bennu matter",
     "How astronauts dock two spacecraft in orbit",
     "Why black holes can launch enormous jets",
@@ -56,7 +55,8 @@
     "How telescope interferometry creates a sharper image",
     "How spacesuits keep astronauts alive in a vacuum",
     "How stars turn hydrogen into light",
-    "How Mars rovers navigate without GPS"
+    "How Mars rovers navigate without GPS",
+    "Why galaxies appear to sit inside dark matter halos"
   ],
   "events": [
     {
@@ -766,14 +766,24 @@
       "replacement_niche": "space",
       "replacement_theme": "mars",
       "finalized_at": "2026-09-26T17:33:27.609361+00:00"
+    },
+    {
+      "transaction_id": "8c18e683a57c438aa9a03756788e948b",
+      "selected_topic": "Why galaxies appear to sit inside dark matter halos",
+      "selected_niche": "space",
+      "selected_theme": "galaxies",
+      "replacement_topic": "Why muscles weaken during long space missions",
+      "replacement_niche": "space",
+      "replacement_theme": "human_spaceflight",
+      "finalized_at": "2026-09-28T10:04:55.485842+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "telescopes",
     "space_weather",
     "moon",
     "cosmology",
-    "mars"
+    "mars",
+    "human_spaceflight"
   ]
 }
