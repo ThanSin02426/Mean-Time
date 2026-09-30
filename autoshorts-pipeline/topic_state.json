@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How astronauts dock two spacecraft in orbit",
     "Why black holes can launch enormous jets",
     "How the early universe formed its first atoms",
     "How gravitational lensing works like a cosmic telescope",
@@ -56,7 +55,8 @@
     "How stars turn hydrogen into light",
     "How Mars rovers navigate without GPS",
     "Why galaxies appear to sit inside dark matter halos",
-    "Why comets grow bright tails near the Sun"
+    "Why comets grow bright tails near the Sun",
+    "How the solar wind shapes Earths magnetosphere"
   ],
   "events": [
     {
@@ -786,14 +786,24 @@
       "replacement_niche": "space",
       "replacement_theme": "galaxies",
       "finalized_at": "2026-09-29T10:04:04.013685+00:00"
+    },
+    {
+      "transaction_id": "06f3c7df65724cd09ae8d6eaa38a9b89",
+      "selected_topic": "How the solar wind shapes Earths magnetosphere",
+      "selected_niche": "space",
+      "selected_theme": "space_weather",
+      "replacement_topic": "Why Uranus rotates on its side",
+      "replacement_niche": "space",
+      "replacement_theme": "solar_system",
+      "finalized_at": "2026-09-30T09:56:26.524362+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "moon",
     "cosmology",
     "mars",
     "human_spaceflight",
-    "galaxies"
+    "galaxies",
+    "solar_system"
   ]
 }
