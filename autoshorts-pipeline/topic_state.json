@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why black holes can launch enormous jets",
     "How the early universe formed its first atoms",
     "How gravitational lensing works like a cosmic telescope",
     "Why Saturns rings are incredibly thin",
@@ -56,7 +55,8 @@
     "How Mars rovers navigate without GPS",
     "Why galaxies appear to sit inside dark matter halos",
     "Why comets grow bright tails near the Sun",
-    "How the solar wind shapes Earths magnetosphere"
+    "How the solar wind shapes Earths magnetosphere",
+    "How the Moon helps stabilize Earths tilt"
   ],
   "events": [
     {
@@ -796,14 +796,24 @@
       "replacement_niche": "space",
       "replacement_theme": "solar_system",
       "finalized_at": "2026-09-30T09:56:26.524362+00:00"
+    },
+    {
+      "transaction_id": "a67f877c546a45d5814c09241244e459",
+      "selected_topic": "How the Moon helps stabilize Earths tilt",
+      "selected_niche": "space",
+      "selected_theme": "moon",
+      "replacement_topic": "Why Mars has little protection from the solar wind",
+      "replacement_niche": "space",
+      "replacement_theme": "space_weather",
+      "finalized_at": "2026-09-30T18:47:22.038324+00:00"
     }
   ],
   "recent_space_themes": [
-    "moon",
     "cosmology",
     "mars",
     "human_spaceflight",
     "galaxies",
-    "solar_system"
+    "solar_system",
+    "space_weather"
   ]
 }
