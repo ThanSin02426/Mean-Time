@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How gravitational lensing works like a cosmic telescope",
     "Why Saturns rings are incredibly thin",
     "How the International Space Station recycles water",
     "How the Andromeda galaxy is approaching the Milky Way",
@@ -56,7 +55,8 @@
     "Why comets grow bright tails near the Sun",
     "How the solar wind shapes Earths magnetosphere",
     "How the Moon helps stabilize Earths tilt",
-    "How adaptive optics removes the twinkle of stars"
+    "How adaptive optics removes the twinkle of stars",
+    "How ion thrusters accelerate spacecraft for years"
   ],
   "events": [
     {
@@ -816,14 +816,24 @@
       "replacement_niche": "space",
       "replacement_theme": "exoplanets",
       "finalized_at": "2026-10-01T10:23:14.325184+00:00"
+    },
+    {
+      "transaction_id": "159ef969c1544b42b1f38068913a90ed",
+      "selected_topic": "How ion thrusters accelerate spacecraft for years",
+      "selected_niche": "space",
+      "selected_theme": "spaceflight",
+      "replacement_topic": "Why black holes can launch enormous jets",
+      "replacement_niche": "space",
+      "replacement_theme": "black_holes",
+      "finalized_at": "2026-10-01T19:13:18.753545+00:00"
     }
   ],
   "recent_space_themes": [
-    "mars",
     "human_spaceflight",
     "galaxies",
     "solar_system",
     "space_weather",
-    "exoplanets"
+    "exoplanets",
+    "black_holes"
   ]
 }

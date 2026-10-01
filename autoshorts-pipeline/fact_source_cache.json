@@ -401,5 +401,10 @@
   "how adaptive optics removes the twinkle of stars": [
     "https://nso.edu/research/adaptive-optics/",
     "https://www.astronomy.com/observing/how-does-adaptive-optics-work/"
+  ],
+  "how ion thrusters accelerate spacecraft for years": [
+    "https://science.nasa.gov/mission/dawn/technology/ion-propulsion/",
+    "https://psyche.ssl.berkeley.edu/2018/01/19/electric-thrusters-psyche-spacecraft-work/",
+    "https://www.space.com/22916-nasa-ion-thruster-world-record-test.html"
   ]
 }
