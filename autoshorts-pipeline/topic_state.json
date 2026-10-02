@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "Why Saturns rings are incredibly thin",
     "How the International Space Station recycles water",
     "How the Andromeda galaxy is approaching the Milky Way",
     "How solar flares can affect technology on Earth",
@@ -56,7 +55,8 @@
     "How the solar wind shapes Earths magnetosphere",
     "How the Moon helps stabilize Earths tilt",
     "How adaptive optics removes the twinkle of stars",
-    "How ion thrusters accelerate spacecraft for years"
+    "How ion thrusters accelerate spacecraft for years",
+    "Why Europa may hide a global ocean"
   ],
   "events": [
     {
@@ -826,14 +826,24 @@
       "replacement_niche": "space",
       "replacement_theme": "black_holes",
       "finalized_at": "2026-10-01T19:13:18.753545+00:00"
+    },
+    {
+      "transaction_id": "8a4d30ebadff4383be9c595b6b50c258",
+      "selected_topic": "Why Europa may hide a global ocean",
+      "selected_niche": "space",
+      "selected_theme": "solar_system",
+      "replacement_topic": "How moonquakes happen on a geologically quiet world",
+      "replacement_niche": "space",
+      "replacement_theme": "moon",
+      "finalized_at": "2026-10-02T18:54:43.118364+00:00"
     }
   ],
   "recent_space_themes": [
-    "human_spaceflight",
     "galaxies",
     "solar_system",
     "space_weather",
     "exoplanets",
-    "black_holes"
+    "black_holes",
+    "moon"
   ]
 }
