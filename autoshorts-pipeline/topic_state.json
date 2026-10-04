@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How the International Space Station recycles water",
     "How the Andromeda galaxy is approaching the Milky Way",
     "How solar flares can affect technology on Earth",
     "How spacecraft steal speed using gravity assists",
@@ -56,7 +55,8 @@
     "How the Moon helps stabilize Earths tilt",
     "How adaptive optics removes the twinkle of stars",
     "How ion thrusters accelerate spacecraft for years",
-    "Why Europa may hide a global ocean"
+    "Why Europa may hide a global ocean",
+    "Why astronauts sometimes see flashes with closed eyes"
   ],
   "events": [
     {
@@ -836,14 +836,24 @@
       "replacement_niche": "space",
       "replacement_theme": "moon",
       "finalized_at": "2026-10-02T18:54:43.118364+00:00"
+    },
+    {
+      "transaction_id": "8d3aa038c01d4addb75450bc0e9c7cde",
+      "selected_topic": "Why astronauts sometimes see flashes with closed eyes",
+      "selected_niche": "space",
+      "selected_theme": "human_spaceflight",
+      "replacement_topic": "What the cosmic microwave background actually is",
+      "replacement_niche": "space",
+      "replacement_theme": "cosmology",
+      "finalized_at": "2026-10-04T17:57:36.945933+00:00"
     }
   ],
   "recent_space_themes": [
-    "galaxies",
     "solar_system",
     "space_weather",
     "exoplanets",
     "black_holes",
-    "moon"
+    "moon",
+    "cosmology"
   ]
 }
