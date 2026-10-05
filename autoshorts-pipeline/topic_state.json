@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How the Andromeda galaxy is approaching the Milky Way",
     "How solar flares can affect technology on Earth",
     "How spacecraft steal speed using gravity assists",
     "How meteorites reveal the history of the solar system",
@@ -56,7 +55,8 @@
     "How adaptive optics removes the twinkle of stars",
     "How ion thrusters accelerate spacecraft for years",
     "Why Europa may hide a global ocean",
-    "Why astronauts sometimes see flashes with closed eyes"
+    "Why astronauts sometimes see flashes with closed eyes",
+    "How astronomers detect planets by watching stars dim"
   ],
   "events": [
     {
@@ -846,14 +846,24 @@
       "replacement_niche": "space",
       "replacement_theme": "cosmology",
       "finalized_at": "2026-10-04T17:57:36.945933+00:00"
+    },
+    {
+      "transaction_id": "1a654e27bb294388afafa8f594f66d7f",
+      "selected_topic": "How astronomers detect planets by watching stars dim",
+      "selected_niche": "space",
+      "selected_theme": "exoplanets",
+      "replacement_topic": "Why Sun-like stars end as white dwarfs",
+      "replacement_niche": "space",
+      "replacement_theme": "stars",
+      "finalized_at": "2026-10-05T21:20:38.351994+00:00"
     }
   ],
   "recent_space_themes": [
-    "solar_system",
     "space_weather",
     "exoplanets",
     "black_holes",
     "moon",
-    "cosmology"
+    "cosmology",
+    "stars"
   ]
 }
