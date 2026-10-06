@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How solar flares can affect technology on Earth",
     "How spacecraft steal speed using gravity assists",
     "How meteorites reveal the history of the solar system",
     "How astronomers photographed a black hole shadow",
@@ -56,7 +55,8 @@
     "How ion thrusters accelerate spacecraft for years",
     "Why Europa may hide a global ocean",
     "Why astronauts sometimes see flashes with closed eyes",
-    "How astronomers detect planets by watching stars dim"
+    "How astronomers detect planets by watching stars dim",
+    "Why red giant stars swell to enormous sizes"
   ],
   "events": [
     {
@@ -856,14 +856,24 @@
       "replacement_niche": "space",
       "replacement_theme": "stars",
       "finalized_at": "2026-10-05T21:20:38.351994+00:00"
+    },
+    {
+      "transaction_id": "4140d0b7698d43ffb071be4cfbb13067",
+      "selected_topic": "Why red giant stars swell to enormous sizes",
+      "selected_niche": "space",
+      "selected_theme": "stars",
+      "replacement_topic": "Why samples from asteroid Bennu matter",
+      "replacement_niche": "space",
+      "replacement_theme": "asteroids_comets",
+      "finalized_at": "2026-10-06T10:38:40.771461+00:00"
     }
   ],
   "recent_space_themes": [
-    "space_weather",
     "exoplanets",
     "black_holes",
     "moon",
     "cosmology",
-    "stars"
+    "stars",
+    "asteroids_comets"
   ]
 }
