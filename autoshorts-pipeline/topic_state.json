@@ -17,7 +17,6 @@
     "space"
   ],
   "used_topics": [
-    "How spacecraft steal speed using gravity assists",
     "How meteorites reveal the history of the solar system",
     "How astronomers photographed a black hole shadow",
     "How Jupiters moon Io became so volcanic",
@@ -56,7 +55,8 @@
     "Why Europa may hide a global ocean",
     "Why astronauts sometimes see flashes with closed eyes",
     "How astronomers detect planets by watching stars dim",
-    "Why red giant stars swell to enormous sizes"
+    "Why red giant stars swell to enormous sizes",
+    "How astronomers track near Earth objects"
   ],
   "events": [
     {
@@ -866,14 +866,24 @@
       "replacement_niche": "space",
       "replacement_theme": "asteroids_comets",
       "finalized_at": "2026-10-06T10:38:40.771461+00:00"
+    },
+    {
+      "transaction_id": "8ce68c887baf446c93e083ce48d35dde",
+      "selected_topic": "How astronomers track near Earth objects",
+      "selected_niche": "space",
+      "selected_theme": "asteroids_comets",
+      "replacement_topic": "How radio telescopes see an invisible universe",
+      "replacement_niche": "space",
+      "replacement_theme": "telescopes",
+      "finalized_at": "2026-10-07T10:30:14.036805+00:00"
     }
   ],
   "recent_space_themes": [
-    "exoplanets",
     "black_holes",
     "moon",
     "cosmology",
     "stars",
-    "asteroids_comets"
+    "asteroids_comets",
+    "telescopes"
   ]
 }
