@@ -1235,5 +1235,20 @@
       "KSC-2014-3130",
       "PIA26588"
     ]
+  },
+  {
+    "run_id": "c0c094c060a64efe8eea3b2ba09dbf9d",
+    "video_id": "jlrR4b5R6xc",
+    "url": "https://youtu.be/jlrR4b5R6xc",
+    "title": "4 Facts: How Perseverance Stores Mars Samples",
+    "topic": "How Perseverance stores samples for a future return mission",
+    "niche": "space",
+    "published_at": "2026-10-08T10:50:18.219986+00:00",
+    "visual_ids": [
+      "PIA24795",
+      "PIA24832",
+      "PIA24306",
+      "PIA25681"
+    ]
   }
 ]
